@@ -1,6 +1,0 @@
-core_cm4.h:2064:26:ITM_SendChar	4
-logger.c:6:5:_write	2
-logger.c:21:6:log_format	1
-logger.c:31:6:logi	1
-logger.c:38:6:logd	1
-logger.c:45:6:loge	1
