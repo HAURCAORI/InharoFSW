@@ -1,40 +1,12 @@
-16:28:19 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+22:12:09 **** Incremental Build of configuration Debug for project Inharo_FSW ****
 make -j20 all 
 arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-../Core/Src/main.c: In function 'vGPSTask':
-../Core/Src/main.c:394:13: warning: pointer targets in passing argument 1 of 'strcpy' differ in signedness [-Wpointer-sign]
-  394 |      strcpy(GPS_message, IH_UART1_buf);
-      |             ^~~~~~~~~~~
-      |             |
-      |             uint8_t * {aka unsigned char *}
-In file included from ../USB_DEVICE/Target/usbd_conf.h:32,
-                 from ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_def.h:28,
-                 from ../USB_DEVICE/App/usb_device.h:32,
-                 from ../Core/Src/main.c:23:
-c:\st\stm32cubeide_1.12.1\stm32cubeide\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.10.3-2021.10.win32_1.0.200.202301161003\tools\arm-none-eabi\include\string.h:38:16: note: expected 'char * restrict' but argument is of type 'uint8_t *' {aka 'unsigned char *'}
-   38 | char  *strcpy (char *__restrict, const char *__restrict);
-      |                ^
-../Core/Src/main.c:394:26: warning: pointer targets in passing argument 2 of 'strcpy' differ in signedness [-Wpointer-sign]
-  394 |      strcpy(GPS_message, IH_UART1_buf);
-      |                          ^~~~~~~~~~~~
-      |                          |
-      |                          uint8_t * {aka unsigned char *}
-In file included from ../USB_DEVICE/Target/usbd_conf.h:32,
-                 from ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_def.h:28,
-                 from ../USB_DEVICE/App/usb_device.h:32,
-                 from ../Core/Src/main.c:23:
-c:\st\stm32cubeide_1.12.1\stm32cubeide\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.10.3-2021.10.win32_1.0.200.202301161003\tools\arm-none-eabi\include\string.h:38:34: note: expected 'const char * restrict' but argument is of type 'uint8_t *' {aka 'unsigned char *'}
-   38 | char  *strcpy (char *__restrict, const char *__restrict);
-      |                                  ^
 ../Core/Src/main.c: In function 'vDebugTask':
-../Core/Src/main.c:466:20: warning: unused variable 'status' [-Wunused-variable]
-  466 |  HAL_StatusTypeDef status;
+../Core/Src/main.c:539:20: warning: unused variable 'status' [-Wunused-variable]
+  539 |  HAL_StatusTypeDef status;
       |                    ^~~~~~
-../Core/Src/main.c:465:11: warning: unused variable 'cmd' [-Wunused-variable]
-  465 |  uint16_t cmd = 0;
-      |           ^~~
-../Core/Src/main.c:464:11: warning: unused variable 'buffer' [-Wunused-variable]
-  464 |  uint32_t buffer;
+../Core/Src/main.c:537:11: warning: unused variable 'buffer' [-Wunused-variable]
+  537 |  uint32_t buffer;
       |           ^~~~~~
 arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: Inharo_FSW.elf
@@ -42,11 +14,11 @@ Finished building target: Inharo_FSW.elf
 arm-none-eabi-size   Inharo_FSW.elf 
 arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
    text	   data	    bss	    dec	    hex	filename
-  95216	    768	  29384	 125368	  1e9b8	Inharo_FSW.elf
+  95136	    764	  29360	 125260	  1e94c	Inharo_FSW.elf
 Finished building: default.size.stdout
  
 Finished building: Inharo_FSW.list
  
 
-16:28:21 Build Finished. 0 errors, 5 warnings. (took 1s.874ms)
+22:12:11 Build Finished. 0 errors, 2 warnings. (took 1s.456ms)
 

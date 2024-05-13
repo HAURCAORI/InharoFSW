@@ -1,54 +1,30 @@
-16:27:59 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+21:44:31 **** Incremental Build of configuration Debug for project Inharo_FSW ****
 make -j20 all 
+arm-none-eabi-gcc "../USB_DEVICE/App/usbd_cdc_if.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"USB_DEVICE/App/usbd_cdc_if.d" -MT"USB_DEVICE/App/usbd_cdc_if.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "USB_DEVICE/App/usbd_cdc_if.o"
+../USB_DEVICE/App/usbd_cdc_if.c: In function 'CDC_Receive_FS':
+../USB_DEVICE/App/usbd_cdc_if.c:272:3: warning: implicit declaration of function 'osEventFlagsSet' [-Wimplicit-function-declaration]
+  272 |   osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_USB);
+      |   ^~~~~~~~~~~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
 arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
    text	   data	    bss	    dec	    hex	filename
-  95216	    768	  29384	 125368	  1e9b8	Inharo_FSW.elf
+  94968	    764	  29360	 125092	  1e8a4	Inharo_FSW.elf
 Finished building: default.size.stdout
  
-16:28:00 **** Incremental Build of configuration Debug for project Inharo_FSW ****
-make -j20 all 
-arm-none-eabi-size   Inharo_FSW.elf 
-   text	   data	    bss	    dec	    hex	filename
-  95216	    768	  29384	 125368	  1e9b8	Inharo_FSW.elf
-Finished building: default.size.stdout
+Finished building: Inharo_FSW.list
  
-16:28:19 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+21:51:23 **** Incremental Build of configuration Debug for project Inharo_FSW ****
 make -j20 all 
 arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-../Core/Src/main.c: In function 'vGPSTask':
-../Core/Src/main.c:394:13: warning: pointer targets in passing argument 1 of 'strcpy' differ in signedness [-Wpointer-sign]
-  394 |      strcpy(GPS_message, IH_UART1_buf);
-      |             ^~~~~~~~~~~
-      |             |
-      |             uint8_t * {aka unsigned char *}
-In file included from ../USB_DEVICE/Target/usbd_conf.h:32,
-                 from ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_def.h:28,
-                 from ../USB_DEVICE/App/usb_device.h:32,
-                 from ../Core/Src/main.c:23:
-c:\st\stm32cubeide_1.12.1\stm32cubeide\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.10.3-2021.10.win32_1.0.200.202301161003\tools\arm-none-eabi\include\string.h:38:16: note: expected 'char * restrict' but argument is of type 'uint8_t *' {aka 'unsigned char *'}
-   38 | char  *strcpy (char *__restrict, const char *__restrict);
-      |                ^
-../Core/Src/main.c:394:26: warning: pointer targets in passing argument 2 of 'strcpy' differ in signedness [-Wpointer-sign]
-  394 |      strcpy(GPS_message, IH_UART1_buf);
-      |                          ^~~~~~~~~~~~
-      |                          |
-      |                          uint8_t * {aka unsigned char *}
-In file included from ../USB_DEVICE/Target/usbd_conf.h:32,
-                 from ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_def.h:28,
-                 from ../USB_DEVICE/App/usb_device.h:32,
-                 from ../Core/Src/main.c:23:
-c:\st\stm32cubeide_1.12.1\stm32cubeide\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.10.3-2021.10.win32_1.0.200.202301161003\tools\arm-none-eabi\include\string.h:38:34: note: expected 'const char * restrict' but argument is of type 'uint8_t *' {aka 'unsigned char *'}
-   38 | char  *strcpy (char *__restrict, const char *__restrict);
-      |                                  ^
 ../Core/Src/main.c: In function 'vDebugTask':
-../Core/Src/main.c:466:20: warning: unused variable 'status' [-Wunused-variable]
-  466 |  HAL_StatusTypeDef status;
+../Core/Src/main.c:527:20: warning: unused variable 'status' [-Wunused-variable]
+  527 |  HAL_StatusTypeDef status;
       |                    ^~~~~~
-../Core/Src/main.c:465:11: warning: unused variable 'cmd' [-Wunused-variable]
-  465 |  uint16_t cmd = 0;
-      |           ^~~
-../Core/Src/main.c:464:11: warning: unused variable 'buffer' [-Wunused-variable]
-  464 |  uint32_t buffer;
+../Core/Src/main.c:525:11: warning: unused variable 'buffer' [-Wunused-variable]
+  525 |  uint32_t buffer;
       |           ^~~~~~
 arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: Inharo_FSW.elf
@@ -56,7 +32,163 @@ Finished building target: Inharo_FSW.elf
 arm-none-eabi-size   Inharo_FSW.elf 
 arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
    text	   data	    bss	    dec	    hex	filename
-  95216	    768	  29384	 125368	  1e9b8	Inharo_FSW.elf
+  95056	    764	  29360	 125180	  1e8fc	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+21:53:17 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/module/buzzer.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/module/buzzer.d" -MT"Core/Src/module/buzzer.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/module/buzzer.o"
+../Core/Src/module/buzzer.c: In function 'Buzzer_Once':
+../Core/Src/module/buzzer.c:15:2: warning: implicit declaration of function 'osDelay' [-Wimplicit-function-declaration]
+   15 |  osDelay(100);
+      |  ^~~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95040	    764	  29360	 125164	  1e8ec	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+21:53:36 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-size   Inharo_FSW.elf 
+   text	   data	    bss	    dec	    hex	filename
+  95040	    764	  29360	 125164	  1e8ec	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+21:54:27 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:527:20: warning: unused variable 'status' [-Wunused-variable]
+  527 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:525:11: warning: unused variable 'buffer' [-Wunused-variable]
+  525 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95040	    764	  29360	 125164	  1e8ec	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+21:56:26 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:528:20: warning: unused variable 'status' [-Wunused-variable]
+  528 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:526:11: warning: unused variable 'buffer' [-Wunused-variable]
+  526 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95040	    764	  29360	 125164	  1e8ec	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+22:01:22 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../USB_DEVICE/App/usbd_cdc_if.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"USB_DEVICE/App/usbd_cdc_if.d" -MT"USB_DEVICE/App/usbd_cdc_if.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "USB_DEVICE/App/usbd_cdc_if.o"
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../USB_DEVICE/App/usbd_cdc_if.c: In function 'CDC_Receive_FS':
+../USB_DEVICE/App/usbd_cdc_if.c:272:3: warning: implicit declaration of function 'osEventFlagsSet' [-Wimplicit-function-declaration]
+  272 |   osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_USB);
+      |   ^~~~~~~~~~~~~~~
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:531:20: warning: unused variable 'status' [-Wunused-variable]
+  531 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:529:11: warning: unused variable 'buffer' [-Wunused-variable]
+  529 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95072	    764	  29360	 125196	  1e90c	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+22:03:12 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:532:20: warning: unused variable 'status' [-Wunused-variable]
+  532 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:530:11: warning: unused variable 'buffer' [-Wunused-variable]
+  530 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95088	    764	  29360	 125212	  1e91c	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+22:10:03 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:536:20: warning: unused variable 'status' [-Wunused-variable]
+  536 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:534:11: warning: unused variable 'buffer' [-Wunused-variable]
+  534 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95136	    764	  29360	 125260	  1e94c	Inharo_FSW.elf
+Finished building: default.size.stdout
+ 
+Finished building: Inharo_FSW.list
+ 
+22:12:09 **** Incremental Build of configuration Debug for project Inharo_FSW ****
+make -j20 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -DSTM32_THREAD_SAFE_STRATEGY=4 -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -I../FATFS/Target -I../FATFS/App -I../USB_DEVICE/App -I../USB_DEVICE/Target -I../Middlewares/Third_Party/FreeRTOS/Source/include -I../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F -I../Middlewares/Third_Party/FatFs/src -I../Middlewares/ST/STM32_USB_Device_Library/Core/Inc -I../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc -I../Core/ThreadSafe -I"C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'vDebugTask':
+../Core/Src/main.c:539:20: warning: unused variable 'status' [-Wunused-variable]
+  539 |  HAL_StatusTypeDef status;
+      |                    ^~~~~~
+../Core/Src/main.c:537:11: warning: unused variable 'buffer' [-Wunused-variable]
+  537 |  uint32_t buffer;
+      |           ^~~~~~
+arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Inharo_FSW.elf
+ 
+arm-none-eabi-size   Inharo_FSW.elf 
+arm-none-eabi-objdump -h -S  Inharo_FSW.elf  > "Inharo_FSW.list"
+   text	   data	    bss	    dec	    hex	filename
+  95136	    764	  29360	 125260	  1e94c	Inharo_FSW.elf
 Finished building: default.size.stdout
  
 Finished building: Inharo_FSW.list

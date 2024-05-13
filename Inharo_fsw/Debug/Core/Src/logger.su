@@ -1,6 +1,0 @@
-../Drivers/CMSIS/Include/core_cm4.h:2064:26:ITM_SendChar	16	static,ignoring_inline_asm
-../Core/Src/logger.c:6:5:_write	32	static
-../Core/Src/logger.c:21:6:log_format	40	static
-../Core/Src/logger.c:31:6:logi	16	static
-../Core/Src/logger.c:38:6:logd	16	static
-../Core/Src/logger.c:45:6:loge	16	static
