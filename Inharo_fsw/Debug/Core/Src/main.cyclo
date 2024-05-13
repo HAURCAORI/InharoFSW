@@ -11,5 +11,5 @@ main.c:527:6:vReceiveTask	4
 main.c:564:6:vDebugTask	3
 main.c:619:6:vSensorReadingCallback	1
 main.c:710:6:vTransmitCallback	2
-main.c:771:6:HAL_TIM_PeriodElapsedCallback	2
-main.c:788:6:Error_Handler	1
+main.c:774:6:HAL_TIM_PeriodElapsedCallback	2
+main.c:791:6:Error_Handler	1

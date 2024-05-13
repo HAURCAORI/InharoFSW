@@ -59,6 +59,7 @@ typedef struct Telemetry {
 	uint8_t hours;
 	uint8_t minutes;
 	uint8_t seconds;
+	uint16_t subseconds;
 	uint16_t packet_count;
 	uint8_t mode;
 	uint16_t state;
@@ -69,7 +70,10 @@ typedef struct Telemetry {
 	float temperature;
 	float voltage;
 	float pressure;
-	float GPS_time;
+	uint8_t GPS_time_hours;
+	uint8_t GPS_time_minutes;
+	uint8_t GPS_time_seconds;
+	uint16_t GPS_time_subseconds;
 	float GPS_altitude;
 	float GPS_latitude;
 	float GPS_longitude;
@@ -77,7 +81,7 @@ typedef struct Telemetry {
 	float tilt_x;
 	float tilt_y;
 	float rot_z;
-	uint8_t cmd_echo[10];
+	uint16_t cmd_echo;
 } Telemetry;
 #pragma pack(pop)
 

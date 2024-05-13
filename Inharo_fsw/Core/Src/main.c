@@ -726,7 +726,10 @@ void vTransmitCallback(void *argument)
 	telemetry.temperature = 23.5f;
 	telemetry.voltage = 3.3f;
 	telemetry.pressure = 100.1f;
-	telemetry.GPS_time = 113456.234f;
+	telemetry.GPS_time_hours = 11;
+	telemetry.GPS_time_minutes = 34;
+	telemetry.GPS_time_seconds = 56;
+	telemetry.GPS_time_subseconds = 234;
 	telemetry.GPS_altitude = 100.3f;
 	telemetry.GPS_latitude = 24.1f;
 	telemetry.GPS_longitude = 26.2f;
@@ -734,7 +737,7 @@ void vTransmitCallback(void *argument)
 	telemetry.tilt_x = 32.0f;
 	telemetry.tilt_y = 12.2f;
 	telemetry.rot_z = 1.8f;
-	strcpy(telemetry.cmd_echo, "Hello");
+	telemetry.cmd_echo = 256;
 
 	packet[0] = 0x7E;
 
