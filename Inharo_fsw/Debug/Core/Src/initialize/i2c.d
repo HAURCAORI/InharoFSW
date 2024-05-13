@@ -1,5 +1,5 @@
 Core/Src/initialize/i2c.o: ../Core/Src/initialize/i2c.c \
- C:/Users/SURFACE/STM32CubeIDE/workspace_1.12.0/InharoFSW/Inharo_fsw/Core/Inc/initialize/i2c.h \
+ C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize/i2c.h \
  ../Core/Inc/main.h ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -54,7 +54,7 @@ Core/Src/initialize/i2c.o: ../Core/Src/initialize/i2c.c \
  ../Middlewares/Third_Party/FatFs/src/integer.h \
  ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
  ../Core/Inc/module/xbee/xbee.h
-C:/Users/SURFACE/STM32CubeIDE/workspace_1.12.0/InharoFSW/Inharo_fsw/Core/Inc/initialize/i2c.h:
+C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize/i2c.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
