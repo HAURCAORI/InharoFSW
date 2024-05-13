@@ -1,3 +1,0 @@
-../Core/Src/initialize/usart.c:15:6:MX_USART1_UART_Init	2
-../Core/Src/initialize/usart.c:48:6:MX_USART2_UART_Init	2
-../Core/Src/initialize/usart.c:81:6:MX_USART3_UART_Init	2
