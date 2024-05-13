@@ -6619,3 +6619,11 @@ java.lang.NullPointerException: Cannot invoke "javax.swing.JTextField.getText()"
 2024-05-13 14:28:54,590 [WARN] IP:2113 - DEVICE_SERIAL0_CDC_FS not found: check if there is a RefParameter without a condition.
 2024-05-13 14:28:54,590 [WARN] IP:2113 - DEVICE_SERIAL1_CDC_FS not found: check if there is a RefParameter without a condition.
 2024-05-13 14:28:54,590 [WARN] IP:2113 - DEVICE_SERIAL2_CDC_FS not found: check if there is a RefParameter without a condition.
+2024-05-13 16:24:54,883 [INFO] Activator:176 - 
+
+
+2024-05-13 16:24:54,884 [INFO] Activator:177 - !SESSION log4j initialized
+2024-05-13 16:25:01,457 [INFO] LogOutputStream:77 - [STDOUT_REDIRECT] 
+2024-05-13 16:25:26,348 [ERROR] LogOutputStream:75 - [STDERR_REDIRECT] SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+2024-05-13 16:25:26,348 [ERROR] LogOutputStream:75 - [STDERR_REDIRECT] SLF4J: Defaulting to no-operation (NOP) logger implementation
+2024-05-13 16:25:26,350 [ERROR] LogOutputStream:75 - [STDERR_REDIRECT] SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.

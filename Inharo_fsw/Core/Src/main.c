@@ -188,6 +188,10 @@ uint8_t uart_rx_buffer[1];
 uint32_t receive_tick;
 XBEE_Buffer_Type xbee_rx_buffer;
 
+// XBee 송신 관련 정의
+uint8_t packet[PACKET_SIZE];
+Telemetry telemetry;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -285,8 +289,8 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-  osTimerStart(SensorReadingHandle, 3000);
-  osTimerStart(TransmitHandle, 3000);
+  osTimerStart(SensorReadingHandle, 5000);
+  osTimerStart(TransmitHandle, 5000);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -805,6 +809,52 @@ void vTransmitCallback(void *argument)
 {
   /* USER CODE BEGIN vTransmitCallback */
 	//logi("transmit");
+
+	telemetry.team_id = 1234;
+	telemetry.hours = 12;
+	telemetry.minutes = 34;
+	telemetry.seconds = 56;
+	telemetry.packet_count = 1;
+	telemetry.mode = 0;
+	telemetry.state = 1;
+	telemetry.altitude = 100.0f;
+	telemetry.air_speed = 4.2f;
+	telemetry.heat_shield = 0;
+	telemetry.parachute = 0;
+	telemetry.temperature = 23.5f;
+	telemetry.voltage = 3.3f;
+	telemetry.pressure = 100.1f;
+	telemetry.GPS_time = 113456.234f;
+	telemetry.GPS_altitude = 100.3f;
+	telemetry.GPS_latitude = 24.1f;
+	telemetry.GPS_longitude = 26.2f;
+	telemetry.GPS_sats = 7;
+	telemetry.tilt_x = 32.0f;
+	telemetry.tilt_y = 12.2f;
+	telemetry.rot_z = 1.8f;
+	strcpy(telemetry.cmd_echo, "Hello");
+
+	packet[0] = 0x7E;
+
+	uint16_t length = TELEMETRY_PACKET_SIZE-4;
+	packet[1] = length >> 8;
+	packet[2] = (uint8_t) length;
+	packet[3] = FRAME_TX;
+	packet[4] = 0x01;
+	packet[5] = FRAME_ADDRESS_HIGH;
+	packet[6] = FRAME_ADDRESS_LOW;
+	packet[7] = 0;
+	memcpy(&packet[8], &telemetry, sizeof(telemetry));
+
+	uint16_t checksum = 0;
+	for(uint8_t i = 3; i < TELEMETRY_PACKET_SIZE-1; i++) {
+		checksum += packet[i];
+	}
+	checksum = 0xFF - ((uint8_t) checksum);
+	packet[TELEMETRY_PACKET_SIZE-1] = checksum;
+
+	HAL_UART_Transmit(&huart3, &packet, sizeof(packet), 10);
+	logd("Telemetry size:%d",sizeof(telemetry));
   /* USER CODE END vTransmitCallback */
 }
 
