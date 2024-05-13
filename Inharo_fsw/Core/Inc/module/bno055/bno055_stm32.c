@@ -1,8 +1,14 @@
-#include <module/bno055_stm32.h>
+/*
+ * bno055_stm32.c
+ *
+ *  Created on: Mar 27, 2024
+ *      Author: SURFACE
+ */
+
+#include "module/bno055/bno055_stm32.h"
 
 I2C_HandleTypeDef *_bno055_i2c_port;
 
-// Functions
 void bno055_assignI2C(I2C_HandleTypeDef *hi2c_device) {
   _bno055_i2c_port = hi2c_device;
 }
@@ -87,4 +93,3 @@ void bno055_readData(uint8_t reg, uint8_t *data, uint8_t len) {
   // HAL_I2C_Mem_Read(_bno055_i2c_port, BNO055_I2C_ADDR_LO<<1, reg,
   // I2C_MEMADD_SIZE_8BIT, data, len, 100);
 }
-

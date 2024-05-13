@@ -35,14 +35,13 @@
 		+ (SERVO_PW_MIN)\
 		)
 
-typedef struct servo_HandleTypeDef{
+typedef struct {
 	// vars
 	// timer channel using
 	TIM_HandleTypeDef *htim;
 	uint32_t channel;
 }Servo_HandleTypeDef;
 
-// Prototypes
 void Servo_Attach(Servo_HandleTypeDef *servo, TIM_HandleTypeDef *htim, uint32_t channel);
 HAL_StatusTypeDef Servo_Write(Servo_HandleTypeDef *servo, int deg);
 

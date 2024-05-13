@@ -24,10 +24,15 @@ RM := rm -rf
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/ThreadSafe/subdir.mk
 -include Core/Startup/subdir.mk
--include Core/Src/servo/subdir.mk
 -include Core/Src/module/subdir.mk
 -include Core/Src/initialize/subdir.mk
 -include Core/Src/subdir.mk
+-include Core/Inc/module/xbee/subdir.mk
+-include Core/Inc/module/servo/subdir.mk
+-include Core/Inc/module/gps/subdir.mk
+-include Core/Inc/module/fatfs_sd/subdir.mk
+-include Core/Inc/module/bno055/subdir.mk
+-include Core/Inc/module/bmp390/subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -76,8 +81,8 @@ all: main-build
 main-build: Inharo_FSW.elf secondary-outputs
 
 # Tool invocations
-Inharo_FSW.elf Inharo_FSW.map: $(OBJS) $(USER_OBJS) C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Inharo_FSW.elf Inharo_FSW.map: $(OBJS) $(USER_OBJS) C:\Users\SURFACE\STM32CubeIDE\workspace_1.12.0\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\SURFACE\STM32CubeIDE\workspace_1.12.0\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

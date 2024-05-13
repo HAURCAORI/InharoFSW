@@ -42,13 +42,13 @@ extern "C" {
 #include "initialize/tim.h"
 #include "initialize/usart.h"
 
-
-#include "module/bmp390.h"
-#include "module/bno055_stm32.h"
 #include "module/buzzer.h"
-#include "servo/servo.h"
-
-#include <module/init_sensor.h>
+#include "module/bmp390/bmp390_stm32.h"
+#include "module/bno055/bno055_stm32.h"
+#include "module/fatfs_sd/fatfs_sd.h"
+#include "module/gps/gps.h"
+#include "module/servo/servo.h"
+#include "module/xbee/xbee.h"
 
 /* USER CODE END Includes */
 

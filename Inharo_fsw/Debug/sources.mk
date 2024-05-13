@@ -22,10 +22,15 @@ C_DEPS :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
+Core/Inc/module/bmp390 \
+Core/Inc/module/bno055 \
+Core/Inc/module/fatfs_sd \
+Core/Inc/module/gps \
+Core/Inc/module/servo \
+Core/Inc/module/xbee \
 Core/Src \
 Core/Src/initialize \
 Core/Src/module \
-Core/Src/servo \
 Core/Startup \
 Core/ThreadSafe \
 Drivers/STM32F4xx_HAL_Driver/Src \

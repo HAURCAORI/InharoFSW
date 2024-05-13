@@ -42,10 +42,17 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/initialize/clock.h ../Core/Inc/initialize/gpio.h \
  ../Core/Inc/initialize/i2c.h ../Core/Inc/initialize/rtc.h \
  ../Core/Inc/initialize/spi.h ../Core/Inc/initialize/tim.h \
- ../Core/Inc/initialize/usart.h ../Core/Inc/module/bmp390.h \
- ../Core/Inc/module/bno055_stm32.h ../Core/Inc/module/bno055.h \
- ../Core/Inc/module/buzzer.h ../Core/Inc/servo/servo.h \
- ../Core/Inc/module/init_sensor.h ../Core/Inc/servo/servo.h \
+ ../Core/Inc/initialize/usart.h ../Core/Inc/module/buzzer.h \
+ ../Core/Inc/module/bmp390/bmp390_stm32.h \
+ ../Core/Inc/module/bmp390/bmp3.h ../Core/Inc/module/bmp390/bmp3_defs.h \
+ ../Core/Inc/module/bno055/bno055_stm32.h \
+ ../Core/Inc/module/bno055/bno055.h \
+ ../Core/Inc/module/fatfs_sd/fatfs_sd.h \
+ ../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h \
+ ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
+ ../Core/Inc/module/xbee/xbee.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
  ../Core/Inc/FreeRTOSConfig.h \
@@ -58,7 +65,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
  ../FATFS/App/fatfs.h ../Middlewares/Third_Party/FatFs/src/ff.h \
- ../Middlewares/Third_Party/FatFs/src/integer.h ../FATFS/Target/ffconf.h \
+ ../FATFS/Target/ffconf.h \
  ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/user_diskio.h \
@@ -115,13 +122,19 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/initialize/spi.h:
 ../Core/Inc/initialize/tim.h:
 ../Core/Inc/initialize/usart.h:
-../Core/Inc/module/bmp390.h:
-../Core/Inc/module/bno055_stm32.h:
-../Core/Inc/module/bno055.h:
 ../Core/Inc/module/buzzer.h:
-../Core/Inc/servo/servo.h:
-../Core/Inc/module/init_sensor.h:
-../Core/Inc/servo/servo.h:
+../Core/Inc/module/bmp390/bmp390_stm32.h:
+../Core/Inc/module/bmp390/bmp3.h:
+../Core/Inc/module/bmp390/bmp3_defs.h:
+../Core/Inc/module/bno055/bno055_stm32.h:
+../Core/Inc/module/bno055/bno055.h:
+../Core/Inc/module/fatfs_sd/fatfs_sd.h:
+../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h:
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+../Middlewares/Third_Party/FatFs/src/integer.h:
+../Core/Inc/module/gps/gps.h:
+../Core/Inc/module/servo/servo.h:
+../Core/Inc/module/xbee/xbee.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h:
 ../Core/Inc/FreeRTOSConfig.h:
@@ -135,7 +148,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
 ../FATFS/App/fatfs.h:
 ../Middlewares/Third_Party/FatFs/src/ff.h:
-../Middlewares/Third_Party/FatFs/src/integer.h:
 ../FATFS/Target/ffconf.h:
 ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h:
 ../Middlewares/Third_Party/FatFs/src/diskio.h:

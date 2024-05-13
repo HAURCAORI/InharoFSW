@@ -1,10 +1,16 @@
-#include "servo/servo.h"
+/*
+ * servo.c
+ *
+ *  Created on: Mar 27, 2024
+ *      Author: SURFACE
+ */
+
+#include "module/servo/servo.h"
 
 void Servo_Attach(Servo_HandleTypeDef *servo, TIM_HandleTypeDef *htim, uint32_t channel){
 	servo->htim 	= htim;
 	servo->channel 	= channel;
 }
-
 
 HAL_StatusTypeDef Servo_Write(Servo_HandleTypeDef *servo, int deg){
 	uint32_t us = 0;

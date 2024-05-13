@@ -1,5 +1,5 @@
 Core/Src/initialize/usart.o: ../Core/Src/initialize/usart.c \
- C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize/usart.h \
+ C:/Users/SURFACE/STM32CubeIDE/workspace_1.12.0/InharoFSW/Inharo_fsw/Core/Inc/initialize/usart.h \
  ../Core/Inc/main.h ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -43,11 +43,18 @@ Core/Src/initialize/usart.o: ../Core/Src/initialize/usart.c \
  ../Core/Inc/initialize/clock.h ../Core/Inc/initialize/gpio.h \
  ../Core/Inc/initialize/i2c.h ../Core/Inc/initialize/rtc.h \
  ../Core/Inc/initialize/spi.h ../Core/Inc/initialize/tim.h \
- ../Core/Inc/initialize/usart.h ../Core/Inc/module/bmp390.h \
- ../Core/Inc/module/bno055_stm32.h ../Core/Inc/module/bno055.h \
- ../Core/Inc/module/buzzer.h ../Core/Inc/servo/servo.h \
- ../Core/Inc/module/init_sensor.h ../Core/Inc/servo/servo.h
-C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize/usart.h:
+ ../Core/Inc/initialize/usart.h ../Core/Inc/module/buzzer.h \
+ ../Core/Inc/module/bmp390/bmp390_stm32.h \
+ ../Core/Inc/module/bmp390/bmp3.h ../Core/Inc/module/bmp390/bmp3_defs.h \
+ ../Core/Inc/module/bno055/bno055_stm32.h \
+ ../Core/Inc/module/bno055/bno055.h \
+ ../Core/Inc/module/fatfs_sd/fatfs_sd.h \
+ ../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h \
+ ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
+ ../Core/Inc/module/xbee/xbee.h
+C:/Users/SURFACE/STM32CubeIDE/workspace_1.12.0/InharoFSW/Inharo_fsw/Core/Inc/initialize/usart.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -98,10 +105,16 @@ C:/Project/STM32/InharoFSW/Inharo_fsw/Core/Inc/initialize/usart.h:
 ../Core/Inc/initialize/spi.h:
 ../Core/Inc/initialize/tim.h:
 ../Core/Inc/initialize/usart.h:
-../Core/Inc/module/bmp390.h:
-../Core/Inc/module/bno055_stm32.h:
-../Core/Inc/module/bno055.h:
 ../Core/Inc/module/buzzer.h:
-../Core/Inc/servo/servo.h:
-../Core/Inc/module/init_sensor.h:
-../Core/Inc/servo/servo.h:
+../Core/Inc/module/bmp390/bmp390_stm32.h:
+../Core/Inc/module/bmp390/bmp3.h:
+../Core/Inc/module/bmp390/bmp3_defs.h:
+../Core/Inc/module/bno055/bno055_stm32.h:
+../Core/Inc/module/bno055/bno055.h:
+../Core/Inc/module/fatfs_sd/fatfs_sd.h:
+../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h:
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+../Middlewares/Third_Party/FatFs/src/integer.h:
+../Core/Inc/module/gps/gps.h:
+../Core/Inc/module/servo/servo.h:
+../Core/Inc/module/xbee/xbee.h:

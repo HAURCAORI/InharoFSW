@@ -119,15 +119,18 @@ volatile Sensor_Data sensor_data;
 
 /* Private function prototypes -----------------------------------------------*/
 void vMainTask(void *argument);
-void vGPSTask(void *argument);
-void vStateManagingTask(void *argument);
-void vReceiveTask(void *argument);
+void vGPSTask(void *argument); 						// GPS communication cycle
+void vStateManagingTask(void *argument);	// state managing cycle
+void vReceiveTask(void *argument);				// receive cycle
 void vDebugTask(void *argument);
 void vSensorReadingCallback(void *argument);
 void vTransmitCallback(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+static void _BMP390_Init(void);
+static void _BNO055_Init(void);
+static void _SD_Init(void);
+static void _Servo_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -174,6 +177,11 @@ int main(void)
   MX_USART3_UART_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
+  _BMP390_Init();
+  _BNO055_Init();
+  _SD_Init();
+  _Servo_Init();
+
 
   /* USER CODE END 2 */
 
@@ -268,6 +276,28 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     //logi("buffer");
   }
 }
+static void _BMP390_Init(void){
+	BMP390_AssignI2C(&hi2c1);
+	BMP390_Init();
+}
+static void _BNO055_Init(void){
+	bno055_assignI2C(&hi2c1);
+	bno055_setup();
+	bno055_setOperationModeNDOF();
+}
+static void _SD_Init(void){
+	SD_Assign(&hspi2);
+	retUSER = f_mount(&USERFatFS, USERPath, 1);
+	if ( retUSER != FR_OK ) Error_Handler();
+}
+static void _Servo_Init(void){
+	Servo_Attach(&hservo1, &htim3, TIM_CHANNEL_1);
+	Servo_Attach(&hservo2, &htim3, TIM_CHANNEL_2);
+	Servo_Attach(&hservo3, &htim3, TIM_CHANNEL_3);
+	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_2);
+	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
+}
 
 /* USER CODE END 4 */
 
@@ -289,10 +319,6 @@ void vMainTask(void *argument)
   //uint8_t data[]= {0x7E, 0x00, 0x0A, 0x01, 0x01, 0xCC, 0xCC, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x71};
   logi("Initializing...");
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
-  Init_BMP390();
-  Init_BNO055();
-  Init_SD();
-  Init_Servo(&hservo1, &hservo2, &hservo3);
   osDelay(100);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
   logi("Initialized");
@@ -379,40 +405,40 @@ void vDebugTask(void *argument)
 		event_flag = osEventFlagsWait(USBEventHandle, RECEIVED_USB, osFlagsWaitAny, 1000);
 		if (event_flag & RECEIVED_USB) {
 			Buzzer_Once();
-			memcpy(&cmd, usb_rx_buffer.buffer, DEBUG_CMD_SIZE);
-			switch (cmd) {
-			case DEBUG_CMD_BUZZER:
-				logd("Buzzer");
-				osDelay(100);
-				Buzzer_Once();
-				osDelay(100);
-				Buzzer_Once();
-				break;
-			case DEBUG_CMD_CALIBRATION:
-				status = BMP390_ReadCalibration();
-				if (status == HAL_OK) {
-					logi("BMP390 CAL Complete.");
-				} else {
-					logi("BMP390 CAL Fail.");
-				}
-				break;
-			case DEBUG_CMD_PRESSURE:
-				logd("Pressure");
-
-				if (BMP390_ReadRawPressure(&buffer, 10) != HAL_OK) {
-					logi("BMP Read Pressure Error.");
-				}
-				sensor_data.pressure = BMP390_CompensatePressure(buffer);
-
-				if (BMP390_ReadRawTemperature(&buffer, 10) != HAL_OK) {
-					logi("BMP Read Temperature Error.");
-				}
-				sensor_data.temperature = BMP390_CompensateTemperature(buffer);
-
-				logd("Temperature %f / pressure %f", sensor_data.temperature, sensor_data.pressure);
-
-				break;
-			}
+//			memcpy(&cmd, usb_rx_buffer.buffer, DEBUG_CMD_SIZE);
+//			switch (cmd) {
+//			case DEBUG_CMD_BUZZER:
+//				logd("Buzzer");
+//				osDelay(100);
+//				Buzzer_Once();
+//				osDelay(100);
+//				Buzzer_Once();
+//				break;
+//			case DEBUG_CMD_CALIBRATION:
+//				status = BMP390_ReadCalibration();
+//				if (status == HAL_OK) {
+//					logi("BMP390 CAL Complete.");
+//				} else {
+//					logi("BMP390 CAL Fail.");
+//				}
+//				break;
+//			case DEBUG_CMD_PRESSURE:
+//				logd("Pressure");
+//
+//				if (BMP390_ReadRawPressure(&buffer, 10) != HAL_OK) {
+//					logi("BMP Read Pressure Error.");
+//				}
+//				sensor_data.pressure = BMP390_CompensatePressure(buffer);
+//
+//				if (BMP390_ReadRawTemperature(&buffer, 10) != HAL_OK) {
+//					logi("BMP Read Temperature Error.");
+//				}
+//				sensor_data.temperature = BMP390_CompensateTemperature(buffer);
+//
+//				logd("Temperature %f / pressure %f", sensor_data.temperature, sensor_data.pressure);
+//
+//				break;
+//			}
 		}
 	}
   /* USER CODE END vDebugTask */

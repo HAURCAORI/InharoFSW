@@ -1,4 +1,4 @@
-#include <module/bno055.h>
+#include <module/bno055/bno055.h>
 #include <string.h>
 
 uint16_t accelScale = 100;
