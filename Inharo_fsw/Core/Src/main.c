@@ -44,7 +44,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-
 /* Definitions for Main */
 osThreadId_t MainHandle;
 const osThreadAttr_t Main_attributes = {
@@ -52,22 +51,63 @@ const osThreadAttr_t Main_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
-/* Definitions for Communication */
-osThreadId_t CommunicationHandle;
-const osThreadAttr_t Communication_attributes = {
-  .name = "Communication",
+/* Definitions for GPS */
+osThreadId_t GPSHandle;
+const osThreadAttr_t GPS_attributes = {
+  .name = "GPS",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Telemetry */
-osTimerId_t TelemetryHandle;
-const osTimerAttr_t Telemetry_attributes = {
-  .name = "Telemetry"
+/* Definitions for StateManaging */
+osThreadId_t StateManagingHandle;
+const osThreadAttr_t StateManaging_attributes = {
+  .name = "StateManaging",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
-/* Definitions for EventReceived */
-osEventFlagsId_t EventReceivedHandle;
-const osEventFlagsAttr_t EventReceived_attributes = {
-  .name = "EventReceived"
+/* Definitions for Receive */
+osThreadId_t ReceiveHandle;
+const osThreadAttr_t Receive_attributes = {
+  .name = "Receive",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for Debug */
+osThreadId_t DebugHandle;
+const osThreadAttr_t Debug_attributes = {
+  .name = "Debug",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for SensorReading */
+osTimerId_t SensorReadingHandle;
+const osTimerAttr_t SensorReading_attributes = {
+  .name = "SensorReading"
+};
+/* Definitions for Transmit */
+osTimerId_t TransmitHandle;
+const osTimerAttr_t Transmit_attributes = {
+  .name = "Transmit"
+};
+/* Definitions for TransmitSemaphore */
+osSemaphoreId_t TransmitSemaphoreHandle;
+const osSemaphoreAttr_t TransmitSemaphore_attributes = {
+  .name = "TransmitSemaphore"
+};
+/* Definitions for USBEvent */
+osEventFlagsId_t USBEventHandle;
+const osEventFlagsAttr_t USBEvent_attributes = {
+  .name = "USBEvent"
+};
+/* Definitions for GPSEvent */
+osEventFlagsId_t GPSEventHandle;
+const osEventFlagsAttr_t GPSEvent_attributes = {
+  .name = "GPSEvent"
+};
+/* Definitions for CommandEvent */
+osEventFlagsId_t CommandEventHandle;
+const osEventFlagsAttr_t CommandEvent_attributes = {
+  .name = "CommandEvent"
 };
 /* USER CODE BEGIN PV */
 
@@ -78,9 +118,13 @@ volatile Sensor_Data sensor_data;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
-void MainTask(void *argument);
-void CommunicationTask(void *argument);
-void TelemetrySend(void *argument);
+void vMainTask(void *argument);
+void vGPSTask(void *argument);
+void vStateManagingTask(void *argument);
+void vReceiveTask(void *argument);
+void vDebugTask(void *argument);
+void vSensorReadingCallback(void *argument);
+void vTransmitCallback(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -98,7 +142,6 @@ void TelemetrySend(void *argument);
   */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -141,17 +184,25 @@ int main(void)
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of TransmitSemaphore */
+  TransmitSemaphoreHandle = osSemaphoreNew(1, 1, &TransmitSemaphore_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* Create the timer(s) */
-  /* creation of Telemetry */
-  TelemetryHandle = osTimerNew(TelemetrySend, osTimerPeriodic, NULL, &Telemetry_attributes);
+  /* creation of SensorReading */
+  SensorReadingHandle = osTimerNew(vSensorReadingCallback, osTimerPeriodic, NULL, &SensorReading_attributes);
+
+  /* creation of Transmit */
+  TransmitHandle = osTimerNew(vTransmitCallback, osTimerPeriodic, NULL, &Transmit_attributes);
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-  osTimerStart(TelemetryHandle, 3000);
+  osTimerStart(SensorReadingHandle, 3000);
+  osTimerStart(TransmitHandle, 3000);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -160,18 +211,33 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of Main */
-  MainHandle = osThreadNew(MainTask, NULL, &Main_attributes);
+  MainHandle = osThreadNew(vMainTask, NULL, &Main_attributes);
 
-  /* creation of Communication */
-  CommunicationHandle = osThreadNew(CommunicationTask, NULL, &Communication_attributes);
+  /* creation of GPS */
+  GPSHandle = osThreadNew(vGPSTask, NULL, &GPS_attributes);
+
+  /* creation of StateManaging */
+  StateManagingHandle = osThreadNew(vStateManagingTask, NULL, &StateManaging_attributes);
+
+  /* creation of Receive */
+  ReceiveHandle = osThreadNew(vReceiveTask, NULL, &Receive_attributes);
+
+  /* creation of Debug */
+  DebugHandle = osThreadNew(vDebugTask, NULL, &Debug_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* Create the event(s) */
-  /* creation of EventReceived */
-  EventReceivedHandle = osEventFlagsNew(&EventReceived_attributes);
+  /* creation of USBEvent */
+  USBEventHandle = osEventFlagsNew(&USBEvent_attributes);
+
+  /* creation of GPSEvent */
+  GPSEventHandle = osEventFlagsNew(&GPSEvent_attributes);
+
+  /* creation of CommandEvent */
+  CommandEventHandle = osEventFlagsNew(&CommandEvent_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -179,9 +245,7 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
-
   /* We should never get here as control is now taken by the scheduler */
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -200,24 +264,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if(huart->Instance == USART3)
   {
-	  /*
-    HAL_UART_Receive_IT(&huart3, (uint8_t *)buffer, sizeof(buffer));
-    printf("%s\n",buffer);
-    printf("receive\n");
-    */
+	  //HAL_UART_Receive_IT(&huart3, (uint8_t *)buffer, sizeof(buffer));
+    //logi("buffer");
   }
 }
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_MainTask */
+/* USER CODE BEGIN Header_vMainTask */
 /**
   * @brief  Function implementing the Main thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_MainTask */
-void MainTask(void *argument)
+/* USER CODE END Header_vMainTask */
+void vMainTask(void *argument)
 {
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
@@ -245,23 +306,77 @@ void MainTask(void *argument)
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_CommunicationTask */
+/* USER CODE BEGIN Header_vGPSTask */
 /**
-* @brief Function implementing the Communication thread.
+* @brief Function implementing the GPS thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_CommunicationTask */
-void CommunicationTask(void *argument) {
-	/* USER CODE BEGIN CommunicationTask */
-	/* Infinite loop */
+/* USER CODE END Header_vGPSTask */
+void vGPSTask(void *argument)
+{
+  /* USER CODE BEGIN vGPSTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END vGPSTask */
+}
+
+/* USER CODE BEGIN Header_vStateManagingTask */
+/**
+* @brief Function implementing the StateManaging thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_vStateManagingTask */
+void vStateManagingTask(void *argument)
+{
+  /* USER CODE BEGIN vStateManagingTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END vStateManagingTask */
+}
+
+/* USER CODE BEGIN Header_vReceiveTask */
+/**
+* @brief Function implementing the Receive thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_vReceiveTask */
+void vReceiveTask(void *argument)
+{
+  /* USER CODE BEGIN vReceiveTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END vReceiveTask */
+}
+
+/* USER CODE BEGIN Header_vDebugTask */
+/**
+* @brief Function implementing the Debug thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_vDebugTask */
+void vDebugTask(void *argument)
+{
+  /* USER CODE BEGIN vDebugTask */
+  /* Infinite loop */
 	uint32_t event_flag;
 	uint32_t buffer;
 	uint16_t cmd = 0;
 	HAL_StatusTypeDef status;
 	for (;;) {
-		event_flag = osEventFlagsWait(EventReceivedHandle, RECEIVED_USB,
-				osFlagsWaitAny, 1000);
+		event_flag = osEventFlagsWait(USBEventHandle, RECEIVED_USB, osFlagsWaitAny, 1000);
 		if (event_flag & RECEIVED_USB) {
 			Buzzer_Once();
 			memcpy(&cmd, usb_rx_buffer.buffer, DEBUG_CMD_SIZE);
@@ -275,8 +390,8 @@ void CommunicationTask(void *argument) {
 				break;
 			case DEBUG_CMD_CALIBRATION:
 				status = BMP390_ReadCalibration();
-				if(status == HAL_OK) {
-				  logi("BMP390 CAL Complete.");
+				if (status == HAL_OK) {
+					logi("BMP390 CAL Complete.");
 				} else {
 					logi("BMP390 CAL Fail.");
 				}
@@ -284,32 +399,39 @@ void CommunicationTask(void *argument) {
 			case DEBUG_CMD_PRESSURE:
 				logd("Pressure");
 
-				if(BMP390_ReadRawPressure(&buffer, 10) != HAL_OK) {
+				if (BMP390_ReadRawPressure(&buffer, 10) != HAL_OK) {
 					logi("BMP Read Pressure Error.");
 				}
 				sensor_data.pressure = BMP390_CompensatePressure(buffer);
 
-				if(BMP390_ReadRawTemperature(&buffer, 10) != HAL_OK) {
+				if (BMP390_ReadRawTemperature(&buffer, 10) != HAL_OK) {
 					logi("BMP Read Temperature Error.");
 				}
-				sensor_data.temperature =  BMP390_CompensateTemperature(buffer);
+				sensor_data.temperature = BMP390_CompensateTemperature(buffer);
 
 				logd("Temperature %f / pressure %f", sensor_data.temperature, sensor_data.pressure);
 
 				break;
 			}
 		}
-
 	}
-	/* USER CODE END CommunicationTask */
+  /* USER CODE END vDebugTask */
 }
 
-/* TelemetrySend function */
-void TelemetrySend(void *argument)
+/* vSensorReadingCallback function */
+void vSensorReadingCallback(void *argument)
 {
-  /* USER CODE BEGIN TelemetrySend */
-	logd("Telemetry");
-  /* USER CODE END TelemetrySend */
+  /* USER CODE BEGIN vSensorReadingCallback */
+
+  /* USER CODE END vSensorReadingCallback */
+}
+
+/* vTransmitCallback function */
+void vTransmitCallback(void *argument)
+{
+  /* USER CODE BEGIN vTransmitCallback */
+
+  /* USER CODE END vTransmitCallback */
 }
 
 /**

@@ -110,7 +110,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
 typedef void *osEventFlagsId_t;
-extern osEventFlagsId_t EventReceivedHandle;
+extern osEventFlagsId_t USBEventHandle;
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
@@ -261,7 +261,7 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   */
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
-	/* USER CODE BEGIN 6 */
+  /* USER CODE BEGIN 6 */
 	USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
 	USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 
@@ -269,7 +269,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 		memcpy(usb_rx_buffer.buffer, _buffer.buffer, sizeof(usb_rx_buffer.buffer));
 		memset(_buffer.buffer, 0, RECEIVED_USB);
 		_buffer.pos = 0;
-		osEventFlagsSet(EventReceivedHandle, RECEIVED_USB);
+		osEventFlagsSet(USBEventHandle, RECEIVED_USB);
 		return (USBD_OK);
 	}
 
@@ -280,7 +280,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 	}
 
 	return (USBD_OK);
-	/* USER CODE END 6 */
+  /* USER CODE END 6 */
 }
 
 /**

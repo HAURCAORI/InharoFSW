@@ -77,7 +77,7 @@ main-build: Inharo_FSW.elf secondary-outputs
 
 # Tool invocations
 Inharo_FSW.elf Inharo_FSW.map: $(OBJS) $(USER_OBJS) C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "Inharo_FSW.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project\STM32\InharoFSW\Inharo_fsw\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Inharo_FSW.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
