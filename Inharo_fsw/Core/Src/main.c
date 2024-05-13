@@ -25,23 +25,43 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "type.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef struct{
+	// bmp390, scale: 100
+	int32_t altitude;
+	int64_t temperature;
+	uint64_t pressure;
+	// bno055
+	double acc_x;
+	double acc_y;
+	double acc_z;
+	double rot_x;
+	double rot_y;
+	double rot_z;
+	double mag_x;
+	double mag_y;
+	double mag_z;
+	// battery voltage, scale: 100
+	uint16_t battery_voltage;
+	// airspeed, scale: 100
+	uint16_t air_speed;
+}SensorDataContainerTypeDef;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define IH_UART1_MAX_LENGTH 80
-#define IH_UART1_HEADER1 'G'
-#define IH_UART1_HEADER2 'G'
-#define IH_UART1_HEADER3 'A'
-#define IH_UART1_TERMINATOR '*'
+#define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
+#define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
 
-#define GPS_MAX_LENGTH 82
-
+#define IH_UART1_MAX_LENGTH (80)
+#define IH_UART1_HEADER1 ('G')
+#define IH_UART1_HEADER2 ('G')
+#define IH_UART1_HEADER3 ('A')
+#define IH_UART1_TERMINATOR ('*')
 
 /* USER CODE END PD */
 
@@ -122,6 +142,8 @@ const osEventFlagsAttr_t CommandEvent_attributes = {
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 volatile Sensor_Data sensor_data;
+
+SensorDataContainerTypeDef sensor_data_container = {0,};
 
 uint8_t IH_UART1_headerPass = 0;
 uint8_t IH_UART1_pMessage = 0;
@@ -393,6 +415,8 @@ void vGPSTask(void *argument)
 
   			strcpy(GPS_message, IH_UART1_buf);
   			// ToDo: request parsing
+
+
   			if (GPS_notReadFlag == 1){
   				GPS_overwriteFlag = 1;
   				GPS_onceOverwriteFlag = 1;
@@ -511,6 +535,89 @@ void vDebugTask(void *argument)
 void vSensorReadingCallback(void *argument)
 {
   /* USER CODE BEGIN vSensorReadingCallback */
+	int64_t temperature;
+	uint64_t pressure;
+	bno055_vector_t bno055vector;
+	double acc_x, acc_y, acc_z;
+	double rot_x, rot_y, rot_z;
+	double mag_x, mag_y, mag_z;
+	int16_t ADC1_CH0, ADC1_CH1;
+	int32_t altitude;
+	uint16_t battery_voltage;
+	uint16_t air_speed;
+
+	// read bmp390
+	BMP390_GetValue(&temperature, &pressure, 50);
+
+	// read bno055
+	bno055vector = bno055_getVectorAccelerometer();
+	acc_x = bno055vector.x;
+	acc_y = bno055vector.y;
+	acc_z = bno055vector.z;
+	bno055vector = bno055_getVectorGyroscope();
+	rot_x = bno055vector.x;
+	rot_y = bno055vector.y;
+	rot_z = bno055vector.z;
+	bno055vector = bno055_getVectorMagnetometer();
+	mag_x = bno055vector.x;
+	mag_y = bno055vector.y;
+	mag_z = bno055vector.z;
+
+	// read ADC1 CH0
+	HAL_ADC_Start(&hadc1);
+	HAL_ADC_PollForConversion(&hadc1, 50);
+	ADC1_CH0 = HAL_ADC_GetValue(&hadc1);
+
+	// read ADC1 CH1
+	HAL_ADC_Start(&hadc1);
+	HAL_ADC_PollForConversion(&hadc1, 50);
+	ADC1_CH1 = HAL_ADC_GetValue(&hadc1);
+
+	// calculate altitude
+  /*
+  	 * Solve:
+  	 *
+  	 *     /        -(aR / g)     \
+  	 *    | (p / p1)          . T1 | - T1
+  	 *     \                      /
+  	 * h = -------------------------------  + h1
+  	 *                   a
+  	 * a:  temperature gradient
+  	 * R:  gas constant of air
+  	 * g:  gravity constant
+  	 * p:  pressure
+  	 * p1: pressure, sea level
+  	 * T1: temperature, sea level
+  	 */
+  //ToDo: get sea level pressure (calibrated)from RTC backup register
+//  double pressure_sea_level = 101325*100;
+//  double pressure_ratio = pressure / pressure_sea_level;
+  double pressure_ratio = pressure * 9.869232667160128e-4;
+  altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT * 100;
+
+	// calculate battery voltage
+  //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
+  battery_voltage = ADC1_CH0 * 0.123287671232877;
+
+	// calculate air speed
+  air_speed = DP_calculateAirSpeedComp(ADC1_CH1, pressure / 100.f, temperature / 100.f);
+
+	// move data to sensor data container
+  // ToDo: block other task and move data
+  sensor_data_container.pressure = pressure;
+  sensor_data_container.temperature = temperature;
+  sensor_data_container.acc_x = acc_x;
+  sensor_data_container.acc_y = acc_y;
+  sensor_data_container.acc_z = acc_z;
+  sensor_data_container.rot_x = rot_x;
+  sensor_data_container.rot_y = rot_y;
+  sensor_data_container.rot_z = rot_z;
+  sensor_data_container.mag_x = mag_x;
+  sensor_data_container.mag_y = mag_y;
+  sensor_data_container.mag_z = mag_z;
+  sensor_data_container.altitude = altitude;
+  sensor_data_container.battery_voltage = battery_voltage;
+  sensor_data_container.air_speed = air_speed;
 
   /* USER CODE END vSensorReadingCallback */
 }
