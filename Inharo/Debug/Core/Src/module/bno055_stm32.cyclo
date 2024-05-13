@@ -1,0 +1,4 @@
+../Core/Src/module/bno055_stm32.c:6:6:bno055_assignI2C	1
+../Core/Src/module/bno055_stm32.c:10:6:bno055_delay	1
+../Core/Src/module/bno055_stm32.c:18:6:bno055_writeData	23
+../Core/Src/module/bno055_stm32.c:82:6:bno055_readData	1

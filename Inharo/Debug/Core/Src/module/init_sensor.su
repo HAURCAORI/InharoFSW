@@ -1,0 +1,4 @@
+../Core/Src/module/init_sensor.c:12:6:Init_BMP390	24	static
+../Core/Src/module/init_sensor.c:47:6:Init_BNO055	8	static
+../Core/Src/module/init_sensor.c:53:6:Init_SD	4	static
+../Core/Src/module/init_sensor.c:59:6:Init_Servo	24	static
