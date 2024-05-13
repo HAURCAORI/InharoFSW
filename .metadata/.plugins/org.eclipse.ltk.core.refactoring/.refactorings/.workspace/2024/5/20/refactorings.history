@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<session version="1.0">&#x0A;<refactoring comment="Rename resource &apos;Inharo_fsw&apos; to &apos;Inharo_FSW&apos;" description="Rename resource &apos;Inharo_fsw&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="/Inharo_fsw" name="Inharo_FSW" stamp="1715577173121" updateReferences="true"/>&#x0A;<refactoring comment="Delete resource &apos;Inharo&apos;" deleteContents="false" description="Delete resource &apos;Inharo&apos;" element1="/Inharo" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1715578467472"/>
-</session>
