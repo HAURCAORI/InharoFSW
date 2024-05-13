@@ -49,7 +49,24 @@ typedef struct{
 	uint16_t battery_voltage;
 	// airspeed, scale: 100
 	uint16_t air_speed;
+	int altitude_updated_flag;
 }SensorDataContainerTypeDef;
+
+typedef enum{
+	VEHICLE_RESET = 	0x00,
+	F_LAUNCH_WAIT = 	0x01,
+	F_ASCENT = 				0x02,
+	F_HS_DEPLOYED = 	0x03,
+	F_PC_DEPLOYED = 	0x04,
+	F_LANDED = 				0x05,
+
+	SIM_ENABLED = 		0x10,
+	S_LAUNCH_WAIT = 	0x11,
+	S_ASCENT = 				0x12,
+	S_HS_DEPLOYED = 	0x13,
+	S_PC_DEPLOYED = 	0x14,
+	S_LANDED = 				0x15
+}VehicleStateTypeDef;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -62,6 +79,12 @@ typedef struct{
 #define IH_UART1_HEADER2 ('G')
 #define IH_UART1_HEADER3 ('A')
 #define IH_UART1_TERMINATOR ('*')
+
+// scale 100
+#define VEHICLE_ASCENT_THRESHOLD 	500
+#define VEHICLE_HS_THRESHOLD 			500
+#define VEHICLE_PC_THRESHOLD 			10000
+#define VEHICLE_LAND_THRESHOLD 		100
 
 /* USER CODE END PD */
 
@@ -138,12 +161,12 @@ const osEventFlagsAttr_t CommandEvent_attributes = {
   .name = "CommandEvent"
 };
 /* USER CODE BEGIN PV */
-
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 volatile Sensor_Data sensor_data;
 
-SensorDataContainerTypeDef sensor_data_container = {0,};
+SensorDataContainerTypeDef sensor_data_container = {0, };
+VehicleStateTypeDef vehicle_state = {0, };
 
 uint8_t IH_UART1_headerPass = 0;
 uint8_t IH_UART1_pMessage = 0;
@@ -447,10 +470,85 @@ void vGPSTask(void *argument)
 void vStateManagingTask(void *argument)
 {
   /* USER CODE BEGIN vStateManagingTask */
+	// only cares about automatic state transfer from altitude change
+//	VehicleStateTypeDef vehicle_state;
+	int32_t altitude = 0, old_altitude = 0, max_altitude = 0;
+	int32_t s_altitude = 0, s_old_altitude = 0, s_max_altitude = 0;
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+  	// altitude update
+  	while(sensor_data_container.altitude_updated_flag == 0); // false when the flag is set
+
+  	// add blocking start here
+  	old_altitude = altitude;
+  	altitude = sensor_data_container.altitude;
+  	sensor_data_container.altitude_updated_flag = 0;
+  	if ( altitude > max_altitude ) max_altitude = altitude;
+
+//  	s_old_altitude = altitude;
+//  	s_altitude = sensor_data_container.s_altitude;
+//  	sensor_data_container.s_altitude_updated_flag = 0;
+//  	if ( s_altitude > s_max_altitude ) s_max_altitude = s_altitude;
+
+  	switch(vehicle_state){
+  	case F_LAUNCH_WAIT:
+  		if (altitude > VEHICLE_ASCENT_THRESHOLD) {
+  			vehicle_state = F_ASCENT;
+  		}
+  		break;
+  	case F_ASCENT:
+  		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD){
+  			// PC deploy if needed
+  			vehicle_state = F_HS_DEPLOYED;
+  		}
+  		break;
+  	case F_HS_DEPLOYED:
+  		if (altitude < VEHICLE_PC_THRESHOLD){
+  			// ToDo: implement PC deploy
+  			vehicle_state = F_PC_DEPLOYED;
+  		}
+  		break;
+  	case F_PC_DEPLOYED:
+  		if ((old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
+  				(old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
+  			// ToDo: implement buzz
+  			// implement CX OFF
+  			vehicle_state = F_LANDED;
+  		}
+  		break;
+  	case S_LAUNCH_WAIT:
+  		if (s_altitude > VEHICLE_ASCENT_THRESHOLD) {
+  			vehicle_state = S_ASCENT;
+  		}
+  		break;
+  	case S_ASCENT:
+  		if (s_max_altitude - s_altitude > VEHICLE_HS_THRESHOLD){
+  			// PC deploy if needed
+  			vehicle_state = S_HS_DEPLOYED;
+  		}
+  		break;
+  	case S_HS_DEPLOYED:
+  		if (s_altitude < VEHICLE_PC_THRESHOLD){
+  			// ToDo: implement PC deploy
+  			vehicle_state = S_PC_DEPLOYED;
+  		}
+  		break;
+  	case S_PC_DEPLOYED:
+  		if ((s_old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
+  				(s_old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
+  			// ToDo: implement buzz
+  			// implement CX OFF
+  			vehicle_state = S_LANDED;
+  		}
+  		break;
+  	default:
+  		// VEHICLE_RESET, F_LANDED, SIM_ENABLED, S_LANDED
+  		// do nothing, basically...
+  		// doing commanded task will be implemented in vRecieveTask(); function
+  		break;
+  	}
+  	// add blocking end here
   }
   /* USER CODE END vStateManagingTask */
 }
@@ -618,7 +716,7 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.altitude = altitude;
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
-
+  sensor_data_container.altitude_updated_flag = 1;
   /* USER CODE END vSensorReadingCallback */
 }
 

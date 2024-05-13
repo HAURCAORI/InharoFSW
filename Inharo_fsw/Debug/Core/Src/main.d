@@ -51,8 +51,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/integer.h \
- ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
- ../Core/Inc/module/xbee/xbee.h \
+ ../Core/Inc/module/gps/gps.h ../Core/Inc/module/mpxv7002dp/mpxv7002dp.h \
+ ../Core/Inc/module/servo/servo.h ../Core/Inc/module/xbee/xbee.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
  ../Core/Inc/FreeRTOSConfig.h \
@@ -133,6 +133,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FatFs/src/diskio.h:
 ../Middlewares/Third_Party/FatFs/src/integer.h:
 ../Core/Inc/module/gps/gps.h:
+../Core/Inc/module/mpxv7002dp/mpxv7002dp.h:
 ../Core/Inc/module/servo/servo.h:
 ../Core/Inc/module/xbee/xbee.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h:

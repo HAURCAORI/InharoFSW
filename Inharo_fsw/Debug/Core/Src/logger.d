@@ -51,8 +51,8 @@ Core/Src/logger.o: ../Core/Src/logger.c ../Core/Inc/logger.h \
  ../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/integer.h \
- ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
- ../Core/Inc/module/xbee/xbee.h
+ ../Core/Inc/module/gps/gps.h ../Core/Inc/module/mpxv7002dp/mpxv7002dp.h \
+ ../Core/Inc/module/servo/servo.h ../Core/Inc/module/xbee/xbee.h
 ../Core/Inc/logger.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
@@ -115,5 +115,6 @@ Core/Src/logger.o: ../Core/Src/logger.c ../Core/Inc/logger.h \
 ../Middlewares/Third_Party/FatFs/src/diskio.h:
 ../Middlewares/Third_Party/FatFs/src/integer.h:
 ../Core/Inc/module/gps/gps.h:
+../Core/Inc/module/mpxv7002dp/mpxv7002dp.h:
 ../Core/Inc/module/servo/servo.h:
 ../Core/Inc/module/xbee/xbee.h:

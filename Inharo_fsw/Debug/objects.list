@@ -4,6 +4,7 @@
 "./Core/Inc/module/bno055/bno055_stm32.o"
 "./Core/Inc/module/fatfs_sd/fatfs_sd.o"
 "./Core/Inc/module/gps/gps.o"
+"./Core/Inc/module/mpxv7002dp/mpxv7002dp.o"
 "./Core/Inc/module/servo/servo.o"
 "./Core/Inc/module/xbee/xbee.o"
 "./Core/Src/freertos.o"
