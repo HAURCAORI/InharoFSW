@@ -34,6 +34,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define IH_UART1_MAX_LENGTH 80
+#define IH_UART1_HEADER1 'G'
+#define IH_UART1_HEADER2 'G'
+#define IH_UART1_HEADER3 'A'
+#define IH_UART1_TERMINATOR '*'
+
+#define GPS_MAX_LENGTH 82
+
 
 /* USER CODE END PD */
 
@@ -114,6 +122,16 @@ const osEventFlagsAttr_t CommandEvent_attributes = {
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 volatile Sensor_Data sensor_data;
+
+uint8_t IH_UART1_headerPass = 0;
+uint8_t IH_UART1_pMessage = 0;
+uint8_t IH_UART1_byteBuf = 0;
+uint8_t IH_UART1_buf[IH_UART1_MAX_LENGTH] ={0,};
+
+uint8_t GPS_message[GPS_MAX_LENGTH] = {0,};
+uint8_t GPS_notReadFlag = 1;
+uint8_t GPS_overwriteFlag = 1;
+uint8_t GPS_onceOverwriteFlag = 1;
 
 /* USER CODE END PV */
 
@@ -343,9 +361,53 @@ void vGPSTask(void *argument)
 {
   /* USER CODE BEGIN vGPSTask */
   /* Infinite loop */
+	// Task for gathering NMEA message from GPS module using UART1 port
   for(;;)
   {
-    osDelay(1);
+  	if ( HAL_UART_Receive(&huart1, &IH_UART1_byteBuf, sizeof(IH_UART1_byteBuf), HAL_MAX_DELAY)!= HAL_OK){
+  		continue;
+  	}
+  	if (IH_UART1_byteBuf == IH_UART1_HEADER1 && IH_UART1_headerPass == 0){
+  		// the forward one is less frequent condition
+  		IH_UART1_headerPass = 1;
+  	}
+  	else if (IH_UART1_headerPass == 1 && IH_UART1_byteBuf == IH_UART1_HEADER2){
+  		IH_UART1_headerPass = 2;
+  	}
+  	else if (IH_UART1_headerPass == 2 && IH_UART1_byteBuf == IH_UART1_HEADER3){
+  		IH_UART1_headerPass = 3;
+  	}
+  	else if (IH_UART1_headerPass == 3){
+  		// message, start with comma(',')
+  		if (IH_UART1_byteBuf != IH_UART1_TERMINATOR){
+  			// not last byte
+  			IH_UART1_buf[IH_UART1_pMessage] = IH_UART1_byteBuf;
+  			IH_UART1_pMessage++;
+  		}
+  		else{
+  			// last byte
+  			IH_UART1_buf[IH_UART1_pMessage] = '\0';
+  			IH_UART1_headerPass = 0;
+  			IH_UART1_pMessage = 0;
+
+  			strcpy(GPS_message, IH_UART1_buf);
+  			// ToDo: request parsing
+  			if (GPS_notReadFlag == 1){
+  				GPS_overwriteFlag = 1;
+  				GPS_onceOverwriteFlag = 1;
+  			}
+  			else{
+  				GPS_notReadFlag = 1;
+  			}
+  		}
+  	}
+  	else{
+  		// none of above
+  		IH_UART1_headerPass = 0;
+  		IH_UART1_pMessage = 0;
+  	}
+  	HAL_UART_Receive_IT(&huart1, &IH_UART1_byteBuf, sizeof(IH_UART1_byteBuf));
+  	osDelay(1);
   }
   /* USER CODE END vGPSTask */
 }
