@@ -29,6 +29,7 @@ RM := rm -rf
 -include Core/Src/subdir.mk
 -include Core/Inc/module/xbee/subdir.mk
 -include Core/Inc/module/servo/subdir.mk
+-include Core/Inc/module/mpxv7002dp/subdir.mk
 -include Core/Inc/module/gps/subdir.mk
 -include Core/Inc/module/fatfs_sd/subdir.mk
 -include Core/Inc/module/bno055/subdir.mk

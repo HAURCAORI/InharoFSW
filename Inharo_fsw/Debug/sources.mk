@@ -26,6 +26,7 @@ Core/Inc/module/bmp390 \
 Core/Inc/module/bno055 \
 Core/Inc/module/fatfs_sd \
 Core/Inc/module/gps \
+Core/Inc/module/mpxv7002dp \
 Core/Inc/module/servo \
 Core/Inc/module/xbee \
 Core/Src \

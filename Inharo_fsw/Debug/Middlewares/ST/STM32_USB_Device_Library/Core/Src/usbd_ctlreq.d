@@ -55,8 +55,8 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.o: \
  ../Core/Inc/module/fatfs_sd/fatfs_sd_conf.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/integer.h \
- ../Core/Inc/module/gps/gps.h ../Core/Inc/module/servo/servo.h \
- ../Core/Inc/module/xbee/xbee.h \
+ ../Core/Inc/module/gps/gps.h ../Core/Inc/module/mpxv7002dp/mpxv7002dp.h \
+ ../Core/Inc/module/servo/servo.h ../Core/Inc/module/xbee/xbee.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_core.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h \
@@ -125,6 +125,7 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.o: \
 ../Middlewares/Third_Party/FatFs/src/diskio.h:
 ../Middlewares/Third_Party/FatFs/src/integer.h:
 ../Core/Inc/module/gps/gps.h:
+../Core/Inc/module/mpxv7002dp/mpxv7002dp.h:
 ../Core/Inc/module/servo/servo.h:
 ../Core/Inc/module/xbee/xbee.h:
 ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h:
