@@ -1,3 +1,3 @@
-Inharo_fsw/Debug/*
-Inharo_fsw/.settings/*
-./metadata/*
+Inharo_fsw/Debug/
+Inharo_fsw/.settings/
+.metadata/
