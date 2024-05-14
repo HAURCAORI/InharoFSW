@@ -540,7 +540,7 @@ void vStateManagingTask(void *argument)
   for(;;)
   {
   	// altitude update
-  	while(sensor_data_container.altitude_updated_flag == 0); // false when the flag is set
+  	//while(sensor_data_container.altitude_updated_flag == 0); // false when the flag is set
 
   	// add blocking start here
   	old_altitude = altitude;
@@ -610,6 +610,7 @@ void vStateManagingTask(void *argument)
   		// doing commanded task will be implemented in vRecieveTask(); function
   		break;
   	}
+  	osDelay(100);
   	// add blocking end here
   }
   /* USER CODE END vStateManagingTask */
