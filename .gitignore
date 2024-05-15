@@ -3,3 +3,4 @@ Inharo_fsw/.settings/
 .metadata/
 Inharo_fsw/Debug/*.d
 Inharo_fsw/Debug/*.o
+GPS_Setup/

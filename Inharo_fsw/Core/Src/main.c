@@ -74,11 +74,7 @@ typedef enum{
 #define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
 #define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
 
-#define IH_UART1_MAX_LENGTH (80)
-#define IH_UART1_HEADER1 ('G')
-#define IH_UART1_HEADER2 ('G')
-#define IH_UART1_HEADER3 ('A')
-#define IH_UART1_TERMINATOR ('*')
+
 
 // scale 100
 #define VEHICLE_ASCENT_THRESHOLD 	500
@@ -100,7 +96,7 @@ osThreadId_t MainHandle;
 const osThreadAttr_t Main_attributes = {
   .name = "Main",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for GPS */
 osThreadId_t GPSHandle;
@@ -114,7 +110,7 @@ osThreadId_t StateManagingHandle;
 const osThreadAttr_t StateManaging_attributes = {
   .name = "StateManaging",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for Receive */
 osThreadId_t ReceiveHandle;
@@ -140,27 +136,22 @@ osTimerId_t TransmitHandle;
 const osTimerAttr_t Transmit_attributes = {
   .name = "Transmit"
 };
-
 /* Definitions for TransmitSemaphore */
+osSemaphoreId_t TransmitSemaphoreHandle;
+const osSemaphoreAttr_t TransmitSemaphore_attributes = {
+  .name = "TransmitSemaphore"
+};
+/* Definitions for ReceiveSemaphore */
 osSemaphoreId_t ReceiveSemaphoreHandle;
 const osSemaphoreAttr_t ReceiveSemaphore_attributes = {
   .name = "ReceiveSemaphore"
 };
-
-// ----------EVENT-------------
-
-/* Definitions for GPSEvent */
-osEventFlagsId_t EventGPSHandle;
-const osEventFlagsAttr_t EventGPS_attributes = {
-  .name = "EventGPS"
-};
 /* Definitions for CommandEvent */
-osEventFlagsId_t EventCommandHandle;
-const osEventFlagsAttr_t EventCommand_attributes = {
-  .name = "EventCommand"
+osEventFlagsId_t CommandEventHandle;
+const osEventFlagsAttr_t CommandEvent_attributes = {
+  .name = "CommandEvent"
 };
-
-/* Definitions for CommandEvent */
+/* Definitions for EventReceive */
 osEventFlagsId_t EventReceiveHandle;
 const osEventFlagsAttr_t EventReceive_attributes = {
   .name = "EventReceive"
@@ -183,22 +174,24 @@ uint8_t GPS_notReadFlag = 1;
 uint8_t GPS_overwriteFlag = 1;
 uint8_t GPS_onceOverwriteFlag = 1;
 
-// XBee 통신 관련 정의
-uint8_t uart_rx_buffer[1];
+// Communication definition;
+uint8_t uart1_rx_buffer[1];
+uint8_t uart3_rx_buffer[1];
 uint32_t receive_tick;
-XBEE_Buffer_Type xbee_rx_buffer;
+XBEE_Packet_Buffer xbee_rx_buffer;
+GPS_Packet_Buffer gps_rx_buffer;
 
-// XBee 송신 관련 정의
-uint8_t packet[PACKET_SIZE];
+// XBee Sample
+uint8_t tx_packet[PACKET_SIZE];
 Telemetry telemetry;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void vMainTask(void *argument);
-void vGPSTask(void *argument); 						// GPS communication cycle
-void vStateManagingTask(void *argument);	// state managing cycle
-void vReceiveTask(void *argument);				// receive cycle
+void vGPSTask(void *argument);
+void vStateManagingTask(void *argument);
+void vReceiveTask(void *argument);
 void vDebugTask(void *argument);
 void vSensorReadingCallback(void *argument);
 void vTransmitCallback(void *argument);
@@ -231,7 +224,6 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -245,6 +237,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_RTC_Init();
@@ -274,6 +267,9 @@ int main(void)
 
   /* Create the semaphores(s) */
   /* creation of TransmitSemaphore */
+  TransmitSemaphoreHandle = osSemaphoreNew(1, 1, &TransmitSemaphore_attributes);
+
+  /* creation of ReceiveSemaphore */
   ReceiveSemaphoreHandle = osSemaphoreNew(1, 1, &ReceiveSemaphore_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -289,8 +285,8 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-  osTimerStart(SensorReadingHandle, 5000);
-  osTimerStart(TransmitHandle, 5000);
+  osTimerStart(SensorReadingHandle, 1000);
+  osTimerStart(TransmitHandle, 1000);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -318,13 +314,12 @@ int main(void)
   /* USER CODE END RTOS_THREADS */
 
   /* Create the event(s) */
-  /* creation of GPSEvent */
-  EventGPSHandle = osEventFlagsNew(&EventGPS_attributes);
-
   /* creation of CommandEvent */
-  EventCommandHandle = osEventFlagsNew(&EventCommand_attributes);
+  CommandEventHandle = osEventFlagsNew(&CommandEvent_attributes);
 
+  /* creation of EventReceive */
   EventReceiveHandle = osEventFlagsNew(&EventReceive_attributes);
+
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
@@ -347,56 +342,143 @@ int main(void)
 //uint8_t buffer[14] = {};
 
 
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+	// USART1 - GPS Communication
+	// USART3 - XBEE Communication
   if(huart->Instance == USART3)
   {
-  	//osSemaphoreRelease(ReceiveSemaphoreHandle);
-
-  	if(HAL_GetTick() - receive_tick > 10) {
+  	// Buffer Timeout
+  	if(HAL_GetTick() - receive_tick > 100) {
   		xbee_rx_buffer.isReceiving = FALSE;
   		receive_tick = HAL_GetTick();
   	}
 
+  	// Header Byte Detection
   	if(xbee_rx_buffer.isReceiving == FALSE) {
-  		if(uart_rx_buffer[0] == 0x7E){
+  		if(uart3_rx_buffer[0] == IH_UART3_HEADER){
   			memset(&xbee_rx_buffer,0, sizeof(xbee_rx_buffer));
   			xbee_rx_buffer.isReceiving = TRUE;
   	  	++xbee_rx_buffer.pos;
   		}
-    	HAL_UART_Receive_IT(&huart3, uart_rx_buffer, sizeof(uart_rx_buffer));
   		return;
   	}
 
+
+  	// Get Data(0~1 : Length, 2~n : Data, n+1 : Checksum)
   	if(xbee_rx_buffer.pos == 0) {
   		xbee_rx_buffer.length = 0;
   	} else if(xbee_rx_buffer.pos == 1) {
-  		xbee_rx_buffer.length = uart_rx_buffer[0] * 0xFF;
+  		xbee_rx_buffer.length = uart3_rx_buffer[0] * 0xFF;
   	} else if(xbee_rx_buffer.pos == 2) {
-  		xbee_rx_buffer.length += uart_rx_buffer[0];
-  	} else if(xbee_rx_buffer.pos < xbee_rx_buffer.length + 3){
-  		xbee_rx_buffer.buffer[xbee_rx_buffer.pos-3] = uart_rx_buffer[0];
-  		xbee_rx_buffer.checksum += uart_rx_buffer[0];
-  	} else if(xbee_rx_buffer.pos >= xbee_rx_buffer.length + 3) {
+  		xbee_rx_buffer.length += uart3_rx_buffer[0];
+
+  		// Invalid length data
+  	  if(xbee_rx_buffer.length >= PACKET_SIZE) {
+  	  	xbee_rx_buffer.isReceiving = FALSE;
+  	  }
+  	} else if(xbee_rx_buffer.pos < xbee_rx_buffer.length + IH_UART3_HEADER_OFFSET){
+  		xbee_rx_buffer.buffer[xbee_rx_buffer.pos-IH_UART3_HEADER_OFFSET] = uart3_rx_buffer[0];
+  		xbee_rx_buffer.checksum += uart3_rx_buffer[0];
+  	} else if(xbee_rx_buffer.pos >= xbee_rx_buffer.length + IH_UART3_HEADER_OFFSET) {
+  		// Checksum
   		xbee_rx_buffer.checksum = (uint8_t) xbee_rx_buffer.checksum;
-  		xbee_rx_buffer.checksum = 0xFF - xbee_rx_buffer.checksum;
-			if (osSemaphoreAcquire(ReceiveSemaphoreHandle, 0) == osOK) {
-				if (xbee_rx_buffer.checksum == uart_rx_buffer[0]) {
-					osEventFlagsSet(EventReceiveHandle,
-							EVENT_RECEIVE_XBEE | EVENT_RECEIVE_SUCCESS);
+			xbee_rx_buffer.checksum = 0xFF - xbee_rx_buffer.checksum;
+
+			// Set Event Flags
+			if(osSemaphoreAcquire(ReceiveSemaphoreHandle, 0) == osOK) {
+				if (xbee_rx_buffer.checksum == uart3_rx_buffer[0]) {
+					osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_XBEE | EVENT_RECEIVE_SUCCESS);
 				} else {
-					osEventFlagsSet(EventReceiveHandle,
-							EVENT_RECEIVE_XBEE | EVENT_RECEIVE_FAIL);
+					osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_XBEE | EVENT_RECEIVE_FAIL);
 				}
 				osSemaphoreRelease(ReceiveSemaphoreHandle);
 			}
-  		xbee_rx_buffer.isReceiving = FALSE;
+			xbee_rx_buffer.isReceiving = FALSE;
+			return;
   	}
 
   	++xbee_rx_buffer.pos;
-  	HAL_UART_Receive_IT(&huart3, uart_rx_buffer, sizeof(uart_rx_buffer));
+
+  	// Unlock Buffer
+  	osSemaphoreRelease(ReceiveSemaphoreHandle);
   }
+  else if(huart->Instance == USART1) {
+		// Buffer Timeout
+		if (HAL_GetTick() - receive_tick > 100) {
+			gps_rx_buffer.isReceiving = FALSE;
+			receive_tick = HAL_GetTick();
+		}
+
+		// Header Byte Detection
+		if(gps_rx_buffer.isReceiving == FALSE) {
+			if(uart1_rx_buffer[0] == IH_UART1_HEADER){
+				memset(&gps_rx_buffer,0, sizeof(gps_rx_buffer));
+				gps_rx_buffer.isReceiving = TRUE;
+				++gps_rx_buffer.pos;
+			}
+			return;
+		}
+
+		// Get DeviceID
+		if(gps_rx_buffer.pos == 1) {
+			gps_rx_buffer.deviceID[0] = uart1_rx_buffer[0];
+		} else if(gps_rx_buffer.pos == 2) {
+			gps_rx_buffer.deviceID[1] = uart1_rx_buffer[0];
+		}
+		// Get SentenceID
+		else if(gps_rx_buffer.pos == 3) {
+			gps_rx_buffer.sentenceID[0] = uart1_rx_buffer[0];
+		} else if(gps_rx_buffer.pos == 4) {
+			gps_rx_buffer.sentenceID[1] = uart1_rx_buffer[0];
+		} else if(gps_rx_buffer.pos == 5) {
+			gps_rx_buffer.sentenceID[2] = uart1_rx_buffer[0];
+		}
+		// Get Checksum
+		else if(gps_rx_buffer.pos == UINT16_MAX-1) {
+			gps_rx_buffer.chk[0] = uart1_rx_buffer[0];
+			++gps_rx_buffer.pos;
+			return;
+		} else if(gps_rx_buffer.pos == UINT16_MAX) {
+			gps_rx_buffer.chk[1] = uart1_rx_buffer[0];
+
+			// Set Event Flags
+			if (osSemaphoreAcquire(ReceiveSemaphoreHandle, 0) == osOK) {
+				if (gps_rx_buffer.checksum == HexCharToByte(gps_rx_buffer.chk[0], gps_rx_buffer.chk[1])) {
+					osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_GPS | EVENT_RECEIVE_SUCCESS);
+				} else {
+					osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_GPS | EVENT_RECEIVE_FAIL);
+				}
+				osSemaphoreRelease(ReceiveSemaphoreHandle);
+			}
+
+			gps_rx_buffer.isReceiving = FALSE;
+			return;
+		}
+		// Get Data
+		else if(gps_rx_buffer.pos > 5) {
+			// Invalid length
+			if(gps_rx_buffer.pos - IH_UART1_HEADER_OFFSET >= PACKET_SIZE) {
+				gps_rx_buffer.isReceiving = FALSE;
+				return;
+			}
+
+			// Termination
+			if(uart1_rx_buffer[0] == IH_UART1_TERMINATOR) {
+				gps_rx_buffer.pos = UINT16_MAX-1;
+				return;
+			}
+
+			// Data Write
+			gps_rx_buffer.buffer[gps_rx_buffer.pos - IH_UART1_HEADER_OFFSET] = uart1_rx_buffer[0];
+			++gps_rx_buffer.length;
+		}
+		//Checksum and Increment
+		gps_rx_buffer.checksum ^= uart1_rx_buffer[0];
+		++gps_rx_buffer.pos;
+
+  }
+
 }
 
 static void _BMP390_Init(void){
@@ -468,57 +550,28 @@ void vGPSTask(void *argument)
   /* USER CODE BEGIN vGPSTask */
   /* Infinite loop */
 	// Task for gathering NMEA message from GPS module using UART1 port
+	uint32_t flags;
+	GPS_Packet packet;
+
+	HAL_UART_Receive_DMA(&huart1, uart1_rx_buffer, sizeof(uart1_rx_buffer));
   for(;;)
   {
-  	/*
-  	if ( HAL_UART_Receive(&huart1, &IH_UART1_byteBuf, sizeof(IH_UART1_byteBuf), HAL_MAX_DELAY)!= HAL_OK){
-  		continue;
-  	}
-  	if (IH_UART1_byteBuf == IH_UART1_HEADER1 && IH_UART1_headerPass == 0){
-  		// the forward one is less frequent condition
-  		IH_UART1_headerPass = 1;
-  	}
-  	else if (IH_UART1_headerPass == 1 && IH_UART1_byteBuf == IH_UART1_HEADER2){
-  		IH_UART1_headerPass = 2;
-  	}
-  	else if (IH_UART1_headerPass == 2 && IH_UART1_byteBuf == IH_UART1_HEADER3){
-  		IH_UART1_headerPass = 3;
-  	}
-  	else if (IH_UART1_headerPass == 3){
-  		// message, start with comma(',')
-  		if (IH_UART1_byteBuf != IH_UART1_TERMINATOR){
-  			// not last byte
-  			IH_UART1_buf[IH_UART1_pMessage] = IH_UART1_byteBuf;
-  			IH_UART1_pMessage++;
-  		}
-  		else{
-  			// last byte
-  			IH_UART1_buf[IH_UART1_pMessage] = '\0';
-  			IH_UART1_headerPass = 0;
-  			IH_UART1_pMessage = 0;
+  	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_GPS, osFlagsWaitAny, osWaitForever);
 
-  			strcpy(GPS_message, IH_UART1_buf);
-  			// ToDo: request parsing
+  	// Validation check
+  	if(!(flags & EVENT_RECEIVE_GPS)){ continue; }
+  	if(!(flags & EVENT_RECEIVE_SUCCESS)) { continue; }
+		osSemaphoreAcquire(ReceiveSemaphoreHandle, 10);
+		memset(&packet, 0, sizeof(packet));
+		memcpy(packet.data, gps_rx_buffer.buffer, gps_rx_buffer.length);
+		memcpy(packet.deviceID, gps_rx_buffer.deviceID,2);
+		memcpy(packet.sentenceID, gps_rx_buffer.sentenceID,3);
+		packet.length = gps_rx_buffer.length;
+		osSemaphoreRelease(ReceiveSemaphoreHandle);
 
+		logd("GPS/%s/%s",packet.deviceID, packet.data);
 
-  			if (GPS_notReadFlag == 1){
-  				GPS_overwriteFlag = 1;
-  				GPS_onceOverwriteFlag = 1;
-  			}
-  			else{
-  				GPS_notReadFlag = 1;
-  			}
-  		}
-  	}
-  	else{
-  		// none of above
-  		IH_UART1_headerPass = 0;
-  		IH_UART1_pMessage = 0;
-  	}
-  	HAL_UART_Receive_IT(&huart1, &IH_UART1_byteBuf, sizeof(IH_UART1_byteBuf));
-  	*/
-  	osDelay(1);
-  }
+	}
   /* USER CODE END vGPSTask */
 }
 
@@ -627,28 +680,37 @@ void vReceiveTask(void *argument)
 {
   /* USER CODE BEGIN vReceiveTask */
   /* Infinite loop */
-	uint32_t event_flag;
-	uint8_t message[RECEIVE_BUFFER_SIZE];
-	uint16_t messageSize = 0;
+	uint32_t flags;
+	XBEE_Packet packet;
+	uint8_t RFdata[PACKET_SIZE];
 
-	HAL_UART_Receive_IT(&huart3, uart_rx_buffer, sizeof(uart_rx_buffer));
+	HAL_UART_Receive_DMA(&huart3, uart3_rx_buffer, sizeof(uart3_rx_buffer));
   for(;;)
   {
-  	event_flag = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_XBEE, osFlagsWaitAny, osWaitForever);
+  	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_XBEE, osFlagsWaitAny, osWaitForever);
 
-  	if(!(event_flag & EVENT_RECEIVE_XBEE)) { return; }
-  	if((event_flag & EVENT_RECEIVE_SUCCESS)) {
-  		if(xbee_rx_buffer.length < 5) { return; }
-  		osSemaphoreAcquire(ReceiveSemaphoreHandle, osWaitForever);
-  		memset(message, 0, sizeof(message));
-  		memcpy(message, xbee_rx_buffer.buffer+5, xbee_rx_buffer.length-5);
-  		messageSize = xbee_rx_buffer.length-5;
-  		osSemaphoreRelease(ReceiveSemaphoreHandle);
-  		logd("message:%s",message);
-  	} else {
-  		// fail
+  	// Validation Check;
+  	if(!(flags & EVENT_RECEIVE_XBEE)) { continue; }
+  	if(!(flags & EVENT_RECEIVE_SUCCESS)) { continue; }
+
+		// Block to acquire data
+		osSemaphoreAcquire(ReceiveSemaphoreHandle, 10);
+		memset(&packet, 0, sizeof(packet));
+		memcpy(packet.data, xbee_rx_buffer.buffer, xbee_rx_buffer.length);
+		packet.length = xbee_rx_buffer.length;
+		osSemaphoreRelease(ReceiveSemaphoreHandle);
+
+		// Packet check
+		if (packet.length < 6) { continue; }
+
+		// Processing
+  	switch(packet.data[0]) {
+  	case FRAME_TYPE_RX: {
+  		memset(RFdata, 0, sizeof(RFdata));
+  		memcpy(RFdata, packet.data+5, packet.length-5);
+  		logd("RFdata:%s", RFdata);
   	}
-  	osDelay(1);
+  	}
   }
   /* USER CODE END vReceiveTask */
 }
@@ -838,26 +900,25 @@ void vTransmitCallback(void *argument)
 	telemetry.rot_z = 1.8f;
 	telemetry.cmd_echo = 256;
 
-	packet[0] = 0x7E;
+	tx_packet[0] = 0x7E;
 
 	uint16_t length = TELEMETRY_PACKET_SIZE-4;
-	packet[1] = length >> 8;
-	packet[2] = (uint8_t) length;
-	packet[3] = FRAME_TX;
-	packet[4] = 0x01;
-	packet[5] = FRAME_ADDRESS_HIGH;
-	packet[6] = FRAME_ADDRESS_LOW;
-	packet[7] = 0;
-	memcpy(&packet[8], &telemetry, sizeof(telemetry));
+	tx_packet[1] = length >> 8;
+	tx_packet[2] = (uint8_t) length;
+	tx_packet[3] = FRAME_TYPE_TX;
+	tx_packet[4] = 0x01;
+	tx_packet[5] = FRAME_ADDRESS_HIGH;
+	tx_packet[6] = FRAME_ADDRESS_LOW;
+	tx_packet[7] = 0;
+	memcpy(&tx_packet[8], &telemetry, sizeof(telemetry));
 
 	uint16_t checksum = 0;
 	for(uint8_t i = 3; i < TELEMETRY_PACKET_SIZE-1; i++) {
-		checksum += packet[i];
+		checksum += tx_packet[i];
 	}
 	checksum = 0xFF - ((uint8_t) checksum);
-	packet[TELEMETRY_PACKET_SIZE-1] = checksum;
-
-	HAL_UART_Transmit(&huart3, &packet, sizeof(packet), 10);
+	tx_packet[TELEMETRY_PACKET_SIZE-1] = checksum;
+	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 0);
 	logd("Telemetry size:%d",sizeof(telemetry));
   /* USER CODE END vTransmitCallback */
 }

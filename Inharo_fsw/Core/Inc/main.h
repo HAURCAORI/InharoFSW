@@ -32,6 +32,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "logger.h"
+#include "converter.h"
 
 #include "initialize/adc.h"
 #include "initialize/clock.h"
@@ -41,6 +42,7 @@ extern "C" {
 #include "initialize/spi.h"
 #include "initialize/tim.h"
 #include "initialize/usart.h"
+#include "initialize/dma.h"
 
 #include "module/buzzer.h"
 #include "module/bmp390/bmp390_stm32.h"
