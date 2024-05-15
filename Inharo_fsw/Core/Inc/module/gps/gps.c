@@ -38,6 +38,9 @@ int GPS_NMEA_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
 				word_n = 0;
 				break;
 			}
+			if(word_n > 30) {
+				break;
+			}
 			word[word_n] = byte;
 			word_n++;
 		}

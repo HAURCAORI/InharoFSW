@@ -289,7 +289,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   osTimerStart(SensorReadingHandle, 1000);
-  osTimerStart(TransmitHandle, 1000);
+  osTimerStart(TransmitHandle, 100);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -940,7 +940,7 @@ void vTransmitCallback(void *argument)
 	}
 	checksum = 0xFF - ((uint8_t) checksum);
 	tx_packet[TELEMETRY_PACKET_SIZE-1] = checksum;
-	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 0);
+	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 50);
   /* USER CODE END vTransmitCallback */
 }
 
