@@ -26,16 +26,20 @@
 /* USER CODE BEGIN Includes */
 #include "type.h"
 #include <math.h>
+#include "converter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef struct{
 	// bmp390, scale: 100
-	int32_t altitude;
+	float altitude;
 	int64_t temperature;
 	uint64_t pressure;
 	// bno055
+	double ang_x;
+  double ang_y;
+	double ang_z;
 	double acc_x;
 	double acc_y;
 	double acc_z;
@@ -45,10 +49,10 @@ typedef struct{
 	double mag_x;
 	double mag_y;
 	double mag_z;
-	// battery voltage, scale: 100
-	uint16_t battery_voltage;
-	// airspeed, scale: 100
-	uint16_t air_speed;
+	// battery voltage, scale: 100(x)
+	float battery_voltage;
+	// airspeed, scale: 100(x)
+	float air_speed;
 	int altitude_updated_flag;
 }SensorDataContainerTypeDef;
 
@@ -136,7 +140,6 @@ osTimerId_t TransmitHandle;
 const osTimerAttr_t Transmit_attributes = {
   .name = "Transmit"
 };
-
 /* Definitions for TransmitSemaphore */
 osSemaphoreId_t TransmitSemaphoreHandle;
 const osSemaphoreAttr_t TransmitSemaphore_attributes = {
@@ -160,7 +163,6 @@ const osEventFlagsAttr_t EventReceive_attributes = {
 /* USER CODE BEGIN PV */
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
-volatile Sensor_Data sensor_data;
 
 SensorDataContainerTypeDef sensor_data_container = {0, };
 VehicleStateTypeDef vehicle_state = {0, };
@@ -170,12 +172,9 @@ uint8_t IH_UART1_pMessage = 0;
 uint8_t IH_UART1_byteBuf = 0;
 uint8_t IH_UART1_buf[IH_UART1_MAX_LENGTH] ={0,};
 
-uint8_t GPS_message[GPS_MAX_LENGTH] = {0,};
-uint8_t GPS_notReadFlag = 1;
-uint8_t GPS_overwriteFlag = 1;
-uint8_t GPS_onceOverwriteFlag = 1;
 
 // Communication definition;
+uint32_t packetCount = 0;
 uint8_t uart1_rx_buffer[1];
 uint8_t uart3_rx_buffer[1];
 uint32_t receive_tick;
@@ -185,6 +184,9 @@ GPS_Packet_Buffer gps_rx_buffer;
 // XBee Sample
 uint8_t tx_packet[PACKET_SIZE];
 Telemetry telemetry;
+
+// GPS
+GPS_DataTypeDef gps_data;
 
 /* USER CODE END PV */
 
@@ -338,6 +340,7 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
+
 
 /* USER CODE BEGIN 4 */
 //uint8_t buffer[14] = {};
@@ -554,6 +557,8 @@ void vGPSTask(void *argument)
 	uint32_t flags;
 	GPS_Packet packet;
 
+	uint32_t sentence;
+
 	HAL_UART_Receive_DMA(&huart1, uart1_rx_buffer, sizeof(uart1_rx_buffer));
   for(;;)
   {
@@ -570,8 +575,13 @@ void vGPSTask(void *argument)
 		packet.length = gps_rx_buffer.length;
 		osSemaphoreRelease(ReceiveSemaphoreHandle);
 
-		logd("GPS/%s/%s",packet.deviceID, packet.data);
-
+		sentence = (packet.sentenceID[0] << 16) | (packet.sentenceID[1] << 8) | (packet.sentenceID[2]);
+		switch(sentence) {
+		case GPS_SENTENCE_GGA: {
+			GPS_NMEA_parseGGA(packet.data, &gps_data);
+			//logd("GPS/%s/%s",packet.deviceID, packet.data);
+		}
+		}
 	}
   /* USER CODE END vGPSTask */
 }
@@ -787,10 +797,11 @@ void vSensorReadingCallback(void *argument)
 	double acc_x, acc_y, acc_z;
 	double rot_x, rot_y, rot_z;
 	double mag_x, mag_y, mag_z;
+	double ang_x, ang_y, ang_z;
 	int16_t ADC1_CH0, ADC1_CH1;
-	int32_t altitude;
-	uint16_t battery_voltage;
-	uint16_t air_speed;
+	float altitude;
+	float battery_voltage;
+	float air_speed;
 
 	// read bmp390
 	BMP390_GetValue(&temperature, &pressure, 50);
@@ -808,6 +819,11 @@ void vSensorReadingCallback(void *argument)
 	mag_x = bno055vector.x;
 	mag_y = bno055vector.y;
 	mag_z = bno055vector.z;
+	bno055vector = bno055_getVectorEuler();
+  ang_x = bno055vector.x;
+  ang_y = bno055vector.y;
+  ang_z = bno055vector.z;
+
 
 	// read ADC1 CH0
 	HAL_ADC_Start(&hadc1);
@@ -839,14 +855,16 @@ void vSensorReadingCallback(void *argument)
 //  double pressure_sea_level = 101325*100;
 //  double pressure_ratio = pressure / pressure_sea_level;
   double pressure_ratio = pressure * 9.869232667160128e-4;
-  altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT * 100;
+  altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
 
 	// calculate battery voltage
   //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
-  battery_voltage = ADC1_CH0 * 0.123287671232877;
+  //battery_voltage = ADC1_CH0 * 0.123287671232877;
+  battery_voltage = ADC1_CH0 / 4095.0 * 3.3 * 1.5;
 
 	// calculate air speed
   air_speed = DP_calculateAirSpeedComp(ADC1_CH1, pressure / 100.f, temperature / 100.f);
+  air_speed /= 100;
 
 	// move data to sensor data container
   // ToDo: block other task and move data
@@ -861,6 +879,9 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.mag_x = mag_x;
   sensor_data_container.mag_y = mag_y;
   sensor_data_container.mag_z = mag_z;
+  sensor_data_container.ang_x = ang_x;
+  sensor_data_container.ang_y = ang_y;
+  sensor_data_container.ang_z = ang_z;
   sensor_data_container.altitude = altitude;
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
@@ -872,35 +893,35 @@ void vSensorReadingCallback(void *argument)
 void vTransmitCallback(void *argument)
 {
   /* USER CODE BEGIN vTransmitCallback */
-	//logi("transmit");
-
+	UpdateTime();
 	telemetry.team_id = 1234;
-	telemetry.hours = 12;
-	telemetry.minutes = 34;
-	telemetry.seconds = 56;
-	telemetry.packet_count = 1;
+	telemetry.hours = sTime.Hours;
+	telemetry.minutes = sTime.Minutes;
+	telemetry.seconds = sTime.Seconds;
+	telemetry.subseconds = g_SubSeconds;
+	telemetry.packet_count = packetCount++;
 	telemetry.mode = 0;
 	telemetry.state = 1;
-	telemetry.altitude = 100.0f;
-	telemetry.air_speed = 4.2f;
+	telemetry.altitude = sensor_data_container.altitude;
+	telemetry.air_speed = sensor_data_container.air_speed;
 	telemetry.heat_shield = 0;
 	telemetry.parachute = 0;
-	telemetry.temperature = 23.5f;
-	telemetry.voltage = 3.3f;
-	telemetry.pressure = 100.1f;
-	telemetry.GPS_time_hours = 11;
-	telemetry.GPS_time_minutes = 34;
-	telemetry.GPS_time_seconds = 56;
-	telemetry.GPS_time_subseconds = 234;
-	telemetry.GPS_altitude = 100.3f;
-	telemetry.GPS_latitude = 24.1f;
-	telemetry.GPS_longitude = 26.2f;
-	telemetry.GPS_sats = 7;
-	telemetry.tilt_x = 32.0f;
-	telemetry.tilt_y = 12.2f;
-	telemetry.rot_z = 1.8f;
-	telemetry.cmd_echo = 256;
+	telemetry.temperature = sensor_data_container.temperature;
+	telemetry.voltage = sensor_data_container.battery_voltage;
+	telemetry.pressure = sensor_data_container.pressure;
+	telemetry.GPS_time_hours = gps_data.hours;
+	telemetry.GPS_time_minutes = gps_data.minutes;
+	telemetry.GPS_time_seconds = gps_data.seconds;
+	telemetry.GPS_altitude = gps_data.altitude;
+	telemetry.GPS_latitude = gps_data.latitude;
+	telemetry.GPS_longitude = gps_data.longitude;
+	telemetry.GPS_sats = gps_data.satellites;
+	telemetry.tilt_x = sensor_data_container.ang_z; // Axis Change
+	telemetry.tilt_y = sensor_data_container.ang_y;
+	telemetry.rot_z = sensor_data_container.rot_z;
+	telemetry.cmd_echo = 0xFF;
 
+	//packet header
 	tx_packet[0] = 0x7E;
 
 	uint16_t length = TELEMETRY_PACKET_SIZE-4;
@@ -920,7 +941,6 @@ void vTransmitCallback(void *argument)
 	checksum = 0xFF - ((uint8_t) checksum);
 	tx_packet[TELEMETRY_PACKET_SIZE-1] = checksum;
 	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 0);
-	logd("Telemetry size:%d",sizeof(telemetry));
   /* USER CODE END vTransmitCallback */
 }
 

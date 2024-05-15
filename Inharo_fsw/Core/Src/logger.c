@@ -14,14 +14,18 @@ int _write(int file, char *ptr, int len)
 	return len;
 }
 
-static RTC_TimeTypeDef sTime;
-static RTC_DateTypeDef sDate;
-static uint32_t g_SubSeconds;
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
+uint32_t g_SubSeconds;
 
-void log_format(const char* tag, const char* message, va_list args) {
+void UpdateTime() {
 	g_SubSeconds = ((255-(uint32_t)(hrtc.Instance->SSR))*1000L)/(255+1); // ms
 	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+}
+
+void log_format(const char* tag, const char* message, va_list args) {
+	UpdateTime();
 
 	printf("%02d:%02d:%02d,%03lu[%s] ", sTime.Hours, sTime.Minutes, sTime.Seconds, g_SubSeconds, tag);
 	vprintf(message, args);

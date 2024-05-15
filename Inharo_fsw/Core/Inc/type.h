@@ -8,6 +8,9 @@
 #ifndef INC_TYPE_H_
 #define INC_TYPE_H_
 
+#define PI 3.14159265
+
+
 #define DEBUG_CMD_SIZE 2
 #define DEBUG_CMD_BUZZER 			0x7A62
 #define DEBUG_CMD_CALIBRATION 0x6C63
@@ -33,6 +36,8 @@
 #define FRAME_TYPE_RX 			0x81
 #define FRAME_ADDRESS_HIGH 	0xCC
 #define FRAME_ADDRESS_LOW 	0xCC
+
+#define GPS_SENTENCE_GGA 0x474741
 
 #define IH_UART1_MAX_LENGTH (80)
 #define IH_UART1_HEADER ('$')
@@ -82,11 +87,6 @@ typedef struct GPS_Packet {
 	uint8_t sentenceID[3];
 } GPS_Packet;
 
-typedef struct Sensor_Data {
-	float pressure;
-	float temperature;
-} Sensor_Data;
-
 #pragma pack(push, 1)
 typedef struct Telemetry {
 	uint16_t team_id;
@@ -101,19 +101,18 @@ typedef struct Telemetry {
 	float air_speed;
 	uint8_t heat_shield;
 	uint8_t parachute;
-	float temperature;
+	int64_t temperature;
 	float voltage;
-	float pressure;
+	uint64_t pressure;
 	uint8_t GPS_time_hours;
 	uint8_t GPS_time_minutes;
 	uint8_t GPS_time_seconds;
-	uint16_t GPS_time_subseconds;
 	float GPS_altitude;
-	float GPS_latitude;
-	float GPS_longitude;
+	double GPS_latitude;
+	double GPS_longitude;
 	uint8_t GPS_sats;
-	float tilt_x;
-	float tilt_y;
+	double tilt_x;
+	double tilt_y;
 	float rot_z;
 	uint16_t cmd_echo;
 } Telemetry;

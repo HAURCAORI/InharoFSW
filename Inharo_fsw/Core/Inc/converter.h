@@ -24,4 +24,5 @@ static uint8_t HexCharToByte(uint8_t upper, uint8_t lower) {
 	return value;
 }
 
+
 #endif /* INC_CONVERTER_H_ */

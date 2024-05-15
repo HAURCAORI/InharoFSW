@@ -6,8 +6,10 @@
  */
 
 #include "module/gps/gps.h"
+#include "converter.h"
+#include <stdlib.h>
 
-int GPS_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
+int GPS_NMEA_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
 	// the message starts with comma(','), which means the message cut off the "$GPGGA" header
 	uint8_t head = 0;
 	uint8_t field = 0;
@@ -16,10 +18,11 @@ int GPS_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
 	uint8_t byte;
 
 	int time_now;
-	int hour, minute, second;
+	int hours, minutes, seconds;
 	int latitude, latitude_deg, latitude_point;
 	int longitude, longitude_deg, longitude_point;
 	int altitude;
+	char* end;
 	int satnum;
 
 	while(1){
@@ -42,56 +45,56 @@ int GPS_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
 		switch(field){
 		case 1:
 			// time
-			time_now = atoi(word);
-			second = time_now % 100;
+			time_now = atoi((char*) word);
+			seconds = time_now % 100;
 			time_now /= 100;
-			minute = time_now % 100;
+			minutes = time_now % 100;
 			time_now /= 100;
-			hour = time_now % 100;
+			hours = time_now % 100;
 			// make BCD time
-			hour 	= 	(int) ( hour / 10 << 4 ) | ( hour % 10);
-			minute	= 	(int) ( minute / 10 << 4 ) | ( minute% 10);
-			second	= 	(int) ( second / 10 << 4 ) | ( second % 10);
+			//hours 	= 	(int) ( hours / 10 << 4 ) | ( hours % 10);
+			//minutes	= 	(int) ( minutes / 10 << 4 ) | ( minutes % 10);
+			//seconds	= 	(int) ( seconds / 10 << 4 ) | ( seconds % 10);
 			break;
 		case 2:
 			// latitude
 			// 0.0001 accuracy
-			latitude = atof(word) * 10000;
+			latitude = strtod((char*) word,&end)*10000;
 			latitude_deg = latitude / 1000000;
 			latitude_deg = latitude_deg * 10000;
 			latitude_point = ( latitude - latitude_deg * 100 ) / 60;
 
 			// based on significant figures
-//			latitude = atof(word) * 100000;
-//			latitude_deg = latitude / 10000000;
-//			latitude_deg = latitude_deg * 10000000;
-//			latitude_point = ( latitude - latitude_deg) * 100 / 60;
+			//latitude = atof(word) * 100000;
+			//latitude_deg = latitude / 10000000;
+			//latitude_deg = latitude_deg * 10000000;
+			//latitude_point = ( latitude - latitude_deg) * 100 / 60;
 
 			latitude = latitude_deg + latitude_point;
 			break;
 		case 4:
 			// longitude
 			// 0.0001 accuracy
-			longitude = atof(word) * 10000;
+			longitude = strtod((char*) word,&end) * 10000;
 			longitude_deg = longitude / 1000000;
 			longitude_deg = longitude_deg * 10000;
 			longitude_point = ( longitude - longitude_deg * 100 ) / 60;
 
 			// based on significant figures
-//			longitude = atof(word) * 100000;
-//			longitude_deg = longitude / 10000000;
-//			longitude_deg = longitude_deg * 10000000;
-//			longitude_point = ( longitude - longitude_deg) * 100 / 60;
+			//longitude = atof(word) * 100000;
+			//longitude_deg = longitude / 10000000;
+			//longitude_deg = longitude_deg * 10000000;
+			//longitude_point = ( longitude - longitude_deg) * 100 / 60;
 
 			longitude = longitude_deg + longitude_point;
 			break;
 		case 7:
 			// number of satellites
-			satnum = atoi(word);
+			satnum = atoi((char*) word);
 			break;
 		case 9:
 			// MSL altitude
-			altitude = atof(word)*10;
+			altitude = strtod((char*) word,&end)*10;
 			break;
 		default:
 			break;
@@ -103,12 +106,12 @@ int GPS_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data){
 		}
 	}
 	// completed parsing
-	pGPS_Data->BCDhour = hour;
-	pGPS_Data->BCDminute = minute;
-	pGPS_Data->BCDsecond = second;
-	pGPS_Data->altitude = altitude;
-	pGPS_Data->latitude = latitude;
-	pGPS_Data->longitude = longitude;
+	pGPS_Data->hours = hours;
+	pGPS_Data->minutes = minutes;
+	pGPS_Data->seconds = seconds;
+	pGPS_Data->altitude = altitude / 10.0f;
+	pGPS_Data->latitude = latitude / 10000.0f;
+	pGPS_Data->longitude = longitude / 10000.0f;
 	pGPS_Data->satellites = satnum;
 
 	return 0;
