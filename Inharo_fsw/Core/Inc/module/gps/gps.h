@@ -12,14 +12,14 @@
 
 #define GPS_MAX_LENGTH 82
 
-typedef struct{
-	uint8_t BCDhour;
-	uint8_t BCDminute;
-	uint8_t BCDsecond;
-	int16_t altitude;
-	int32_t latitude;
-	int32_t longitude;
-	int8_t satellites;
+typedef struct GPS_DataTypeDef{
+	uint8_t hours;
+	uint8_t minutes;
+	uint8_t seconds;
+	float altitude;
+	double latitude;
+	double longitude;
+	uint8_t satellites;
 }GPS_DataTypeDef;
 
 int GPS_NMEA_parseGGA(uint8_t *GPS_NMEA_Message, GPS_DataTypeDef* pGPS_Data);

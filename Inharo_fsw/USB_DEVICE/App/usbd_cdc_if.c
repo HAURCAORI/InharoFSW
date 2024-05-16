@@ -110,7 +110,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
 typedef void *osEventFlagsId_t;
-extern osEventFlagsId_t USBEventHandle;
+extern osEventFlagsId_t EventReceiveHandle;
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
@@ -267,9 +267,9 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 
 	if (Buf[0] == '\r') {
 		memcpy(usb_rx_buffer.buffer, _buffer.buffer, sizeof(usb_rx_buffer.buffer));
-		memset(_buffer.buffer, 0, RECEIVED_USB);
+		memset(_buffer.buffer, 0, EVENT_RECEIVE_USB);
 		_buffer.pos = 0;
-		osEventFlagsSet(USBEventHandle, RECEIVED_USB);
+		osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_USB);
 		return (USBD_OK);
 	}
 

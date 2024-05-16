@@ -41,14 +41,17 @@ extern "C" {
 #include "initialize/spi.h"
 #include "initialize/tim.h"
 #include "initialize/usart.h"
+#include "initialize/dma.h"
 
 #include "module/buzzer.h"
 #include "module/bmp390/bmp390_stm32.h"
 #include "module/bno055/bno055_stm32.h"
 #include "module/fatfs_sd/fatfs_sd.h"
 #include "module/gps/gps.h"
+#include <module/mpxv7002dp/mpxv7002dp.h>
 #include "module/servo/servo.h"
 #include "module/xbee/xbee.h"
+
 
 /* USER CODE END Includes */
 
