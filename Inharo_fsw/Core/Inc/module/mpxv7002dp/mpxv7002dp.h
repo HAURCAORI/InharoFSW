@@ -26,7 +26,8 @@
 
 uint16_t DP_calculateAirSpeedComp(uint16_t adc_value, double static_pressure, double static_temperature);
 uint16_t DP_calculateAirSpeedIncomp(uint16_t adc_value, double static_pressure, double static_temperature);
-void DP_setCalibration(uint16_t adc_value);
+void DP_calcCalibrationFromADC(uint16_t adc_value);
+void DP_setCalibrationFromDouble(double calibration_voltage);
 double DP_getCalibration(void);
 
 #endif /* INC_MODULE_MPXV7002DP_MPXV7002DP_H_ */

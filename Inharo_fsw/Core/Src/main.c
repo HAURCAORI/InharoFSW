@@ -172,7 +172,7 @@ Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
 SensorDataContainerTypeDef sensor_data_container = {0, };
-VehicleStateTypeDef vehicle_state = {0, };
+VehicleStateTypeDef vehicle_state = VEHICLE_RESET;
 
 uint8_t IH_UART1_headerPass = 0;
 uint8_t IH_UART1_pMessage = 0;
@@ -211,6 +211,9 @@ static void _BMP390_Init(void);
 static void _BNO055_Init(void);
 static void _SD_Init(void);
 static void _Servo_Init(void);
+int Calibrate(void);
+int Backup(void);
+void BackupRecovery(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -264,6 +267,9 @@ int main(void)
   _BNO055_Init();
   _SD_Init();
   _Servo_Init();
+  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0){
+  	BackupRecovery();
+  }
 
   logi("Initialized");
   /* USER CODE END 2 */
@@ -544,7 +550,7 @@ int Calibrate(void){
 	r_pressure_sea_level = 1 / sensor_data_container.pressure;
 
 	// calibrate velocity calculation
-	DP_setCalibration(sensor_data_container.adc_1);
+	DP_calcCalibrationFromADC(sensor_data_container.adc_1);
 
 	// make calibration data for RTC backup register
 	union{
@@ -583,6 +589,207 @@ int Calibrate(void){
 
 	return 0;
 }
+int Backup(void){
+	bno055_calibration_data_t bno055_cal_data;
+	uint32_t	bkp_vehicle =0;
+	uint32_t	bkp_packet_count = 0;
+	uint32_t 	cal_zero_altitude0 = 0;
+	uint32_t 	cal_zero_altitude1 = 0;
+	uint32_t 	cal_s_zero_altitude0 = 0;
+	uint32_t 	cal_s_zero_altitude1 = 0;
+	uint32_t	cal_zero_velocity0 = 0;
+	uint32_t	cal_zero_velocity1 = 0;
+	uint32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
+	uint32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
+	uint32_t	cal_mag_ofst_y_mag_ofst_z = 0;
+	uint32_t	cal_acc_ofst_x_acc_ofst_y = 0;
+	uint32_t	cal_acc_ofst_z_reserved = 0;
+	uint32_t	cal_rad_mag_rad_acc = 0;
+
+	union{
+		uint8_t 	val_uint8[4];
+		uint32_t	val_uint32;
+	}uint8_to_uint32;
+	union{
+		double 		val_double;
+		uint32_t 	val_uint32[2];
+	}double_to_uint32;
+	union{
+		int16_t 	val_int16[2];
+		uint32_t 	val_uint32;
+	}int16_to_uint32;
+	union{
+		int16_t 	val_uint16[2];
+		uint32_t 	val_uint32;
+	}uint16_to_uint32;
+
+	uint8_to_uint32.val_uint8[0] 		= 0;
+	uint8_to_uint32.val_uint8[1] 		= 0;
+	uint8_to_uint32.val_uint8[2] 		= ( uint8_t ) vehicle_state;
+//	uint8_to_uint32.val_uint8[3]	 	= ( uint8_t ) ( ( ( val_CX & 0x01 ) << 1 ) | 0x01 );
+	uint8_to_uint32.val_uint8[3] 		= 1;
+	bkp_vehicle 										= uint8_to_uint32.val_uint32;
+
+	bkp_packet_count 								= packetCount;
+
+	double_to_uint32.val_double 		= r_pressure_sea_level;
+	cal_zero_altitude0 							= double_to_uint32.val_uint32[0];
+	cal_zero_altitude1 							= double_to_uint32.val_uint32[1];
+
+//	double_to_uint32.val_double 	= r_s_pressure_sea_level;
+//	cal_s_zero_altitude0 					= double_to_uint32.val_uint32[0];
+//	cal_s_zero_altitude1 					= double_to_uint32.val_uint32[1];
+
+	double_to_uint32.val_double			= DP_getCalibration();
+	cal_zero_velocity0 							= double_to_uint32.val_uint32[0];
+	cal_zero_velocity1 							= double_to_uint32.val_uint32[1];
+
+	bno055_cal_data = bno055_getCalibrationData();
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.gyro.y;
+	cal_gyro_ofst_x_gyro_ofst_y 		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.z;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.x;
+	cal_gyro_ofst_z_mag_ofst_x  		=	int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.mag.y;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.z;
+	cal_mag_ofst_y_mag_ofst_z   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.accel.y;
+	cal_acc_ofst_x_acc_ofst_y   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.z;
+	int16_to_uint32.val_int16[1] 		= 0;
+	cal_acc_ofst_z_reserved     		= int16_to_uint32.val_uint32;
+
+	uint16_to_uint32.val_uint16[0] 	= bno055_cal_data.radius.mag;
+	uint16_to_uint32.val_uint16[1] 	= bno055_cal_data.radius.accel;
+	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
+
+	// save calibration data
+  HAL_PWR_EnableBkUpAccess();
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0,		bkp_vehicle);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1,		bkp_packet_count);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4,		cal_s_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5,		cal_s_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7,		cal_zero_velocity1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8,  	cal_gyro_ofst_x_gyro_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9,  	cal_gyro_ofst_z_mag_ofst_x);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, 	cal_mag_ofst_y_mag_ofst_z);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
+  HAL_PWR_DisableBkUpAccess();
+
+	return 0;
+
+}
+void BackupRecovery(void){
+	bno055_calibration_data_t bno055_cal_data;
+	uint32_t 	bkp_vehicle;
+	uint32_t 	bkp_packet_count;
+	uint32_t 	cal_zero_altitude0;
+	uint32_t 	cal_zero_altitude1;
+	uint32_t 	cal_s_zero_altitude0;
+	uint32_t 	cal_s_zero_altitude1;
+	uint32_t	cal_zero_velocity0;
+	uint32_t	cal_zero_velocity1;
+	uint32_t	cal_gyro_ofst_x_gyro_ofst_y;
+	uint32_t	cal_gyro_ofst_z_mag_ofst_x;
+	uint32_t	cal_mag_ofst_y_mag_ofst_z;
+	uint32_t	cal_acc_ofst_x_acc_ofst_y;
+	uint32_t	cal_acc_ofst_z_reserved;
+	uint32_t	cal_rad_mag_rad_acc;
+
+	// load calibration data / backup data
+	HAL_PWR_EnableBkUpAccess();
+	bkp_vehicle 								= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
+	bkp_packet_count 						= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1);
+	cal_zero_altitude0 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
+	cal_zero_altitude1 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR3);
+	cal_s_zero_altitude0 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR4);
+	cal_s_zero_altitude1 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR5);
+	cal_zero_velocity0 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR6);
+	cal_zero_velocity1 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR7);
+	cal_gyro_ofst_x_gyro_ofst_y	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR8);
+	cal_gyro_ofst_z_mag_ofst_x 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR9);
+	cal_mag_ofst_y_mag_ofst_z 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR10);
+	cal_acc_ofst_x_acc_ofst_y 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR11);
+	cal_acc_ofst_z_reserved 		= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR12);
+	cal_rad_mag_rad_acc 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR13);
+	HAL_PWR_DisableBkUpAccess();
+
+	union{
+		uint32_t	val_uint32;
+		uint8_t 	val_uint8[4];
+	}uint32_to_uint8;
+	union{
+		uint32_t 	val_uint32[2];
+		double 		val_double;
+	}uint32_to_double;
+	union{
+		uint32_t 	val_uint32;
+		int16_t 	val_int16[2];
+	}uint32_to_int16;
+	union{
+		uint32_t 	val_uint32;
+		int16_t 	val_uint16[2];
+	}uint32_to_uint16;
+
+
+	uint32_to_uint8.val_uint32 = bkp_vehicle;
+	vehicle_state = uint32_to_uint8.val_uint8[2];
+//	val_CX = 0b00000010U & uint32_to_uint8.val_uint8[3];
+
+	packetCount = bkp_packet_count;
+
+	uint32_to_double.val_uint32[0] = cal_zero_altitude0;
+	uint32_to_double.val_uint32[1] = cal_zero_altitude1;
+	r_pressure_sea_level = uint32_to_double.val_double;
+
+	uint32_to_double.val_uint32[0] = cal_s_zero_altitude0;
+	uint32_to_double.val_uint32[1] = cal_s_zero_altitude1;
+//	r_s_pressure_sea_level = uint32_to_double.val_double;
+
+	uint32_to_double.val_uint32[0] = cal_zero_velocity0;
+	uint32_to_double.val_uint32[1] = cal_zero_velocity1;
+	DP_setCalibrationFromDouble(uint32_to_double.val_double);
+
+	uint32_to_int16.val_uint32 = cal_gyro_ofst_x_gyro_ofst_y;
+	bno055_cal_data.offset.gyro.x = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.gyro.y = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_gyro_ofst_z_mag_ofst_x;
+	bno055_cal_data.offset.gyro.z = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.mag.x = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_mag_ofst_y_mag_ofst_z;
+	bno055_cal_data.offset.mag.y = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.mag.z = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_acc_ofst_x_acc_ofst_y;
+	bno055_cal_data.offset.accel.x = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.accel.y = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_acc_ofst_z_reserved;
+	bno055_cal_data.offset.accel.z = uint32_to_int16.val_int16[0];
+
+	uint32_to_uint16.val_uint32 = cal_rad_mag_rad_acc;
+	bno055_cal_data.radius.mag = uint32_to_uint16.val_uint16[0];
+	bno055_cal_data.radius.accel = uint32_to_uint16.val_uint16[1];
+
+	bno055_setCalibrationData(bno055_cal_data);
+
+	return;
+}
+
 
 /* USER CODE END 4 */
 
