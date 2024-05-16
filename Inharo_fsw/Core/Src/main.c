@@ -34,8 +34,10 @@
 typedef struct{
 	// bmp390, scale: 100
 	float altitude;
+	float s_altitude;
 	int64_t temperature;
 	uint64_t pressure;
+	uint64_t s_pressure;
 	// bno055
 	double tilt_x;
 	double tilt_y;
@@ -51,6 +53,9 @@ typedef struct{
 	double mag_x;
 	double mag_y;
 	double mag_z;
+	// adc
+	uint16_t adc_0;
+	uint16_t adc_1;
 	// battery voltage, scale: 100(x)
 	float battery_voltage;
 	// airspeed, scale: 100(x)
@@ -79,7 +84,7 @@ typedef enum{
 /* USER CODE BEGIN PD */
 #define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
 #define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
-
+double r_pressure_sea_level = 1 / ( 101325* 100 );
 
 
 // scale 100
@@ -515,6 +520,70 @@ static void _Servo_Init(void){
 	Servo_Write(&hservo3, 0);
 }
 
+int Calibrate(void){
+	bno055_calibration_data_t bno055_cal_data;
+
+	int32_t cal_zero_altitude0 = 0;
+	int32_t cal_zero_altitude1 = 0;
+	int32_t	cal_zero_velocity0 = 0;
+	int32_t	cal_zero_velocity1 = 0;
+	int32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
+	int32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
+	int32_t	cal_mag_ofst_y_mag_ofst_z = 0;
+	int32_t	cal_acc_ofst_x_acc_ofst_y = 0;
+	int32_t	cal_acc_ofst_z_reserved = 0;
+	int32_t	cal_imu_radius_mag_acc = 0;
+
+	// get bno055 calibration data
+	if(bno055_getCalibrationState().sys < 0x03) return 1;
+//	if(bno055_getCalibrationState() < 0x02) return 1;
+//	if(bno055_getCalibrationState() < 0x01) return 1;
+	bno055_cal_data = bno055_getCalibrationData();
+
+	// zero altitude calibration; simulation pressure is calibrated when first SIMP command received
+	r_pressure_sea_level = 1 / sensor_data_container.pressure;
+
+	// calibrate velocity calculation
+	DP_setCalibration(sensor_data_container.adc_1);
+
+	// make calibration data for RTC backup register
+	union{
+		double  val_double;
+		int32_t val_int32[2];
+	}double_and_int32;
+
+	double_and_int32.val_double = r_pressure_sea_level;
+	cal_zero_altitude0 = double_and_int32.val_int32[0];
+	cal_zero_altitude1 = double_and_int32.val_int32[1];
+
+	double_and_int32.val_double = DP_getCalibration();
+	cal_zero_velocity0 = double_and_int32.val_int32[0];
+	cal_zero_velocity1 = double_and_int32.val_int32[1];
+
+	cal_gyro_ofst_x_gyro_ofst_y = (bno055_cal_data.offset.gyro.x 	<< 16)|(bno055_cal_data.offset.gyro.y);
+	cal_gyro_ofst_z_mag_ofst_x  = (bno055_cal_data.offset.gyro.z 	<< 16)|(bno055_cal_data.offset.mag.x);
+	cal_mag_ofst_y_mag_ofst_z   = (bno055_cal_data.offset.mag.y  	<< 16)|(bno055_cal_data.offset.mag.z);
+	cal_acc_ofst_x_acc_ofst_y		= (bno055_cal_data.offset.accel.x	<< 16)|(bno055_cal_data.offset.accel.y);
+	cal_acc_ofst_z_reserved			= (bno055_cal_data.offset.accel.z	<< 16);
+	cal_imu_radius_mag_acc			= (bno055_cal_data.radius.mag			<< 16)|(bno055_cal_data.radius.accel);
+
+	// save calibration data
+  HAL_PWR_EnableBkUpAccess();
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7,		cal_zero_velocity1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8,  	cal_gyro_ofst_x_gyro_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9,  	cal_gyro_ofst_z_mag_ofst_x);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, 	cal_mag_ofst_y_mag_ofst_z);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_imu_radius_mag_acc);
+  HAL_PWR_DisableBkUpAccess();
+
+	return 0;
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_vMainTask */
@@ -814,7 +883,7 @@ void vSensorReadingCallback(void *argument)
 	double mag_x, mag_y, mag_z;
 	double ang_x, ang_y, ang_z;
 	double tilt_x, tilt_y;
-	int16_t ADC1_CH0, ADC1_CH1;
+	uint16_t adc_0, adc_1;
 	float altitude;
 	float battery_voltage;
 	float air_speed;
@@ -844,12 +913,12 @@ void vSensorReadingCallback(void *argument)
 	// read ADC1 CH0
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1, 50);
-	ADC1_CH0 = HAL_ADC_GetValue(&hadc1);
+	adc_0 = HAL_ADC_GetValue(&hadc1);
 
 	// read ADC1 CH1
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1, 50);
-	ADC1_CH1 = HAL_ADC_GetValue(&hadc1);
+	adc_1 = HAL_ADC_GetValue(&hadc1);
 
 	// calculate altitude
   /*
@@ -868,10 +937,9 @@ void vSensorReadingCallback(void *argument)
   	 * T1: temperature, sea level
   	 */
   //ToDo: get sea level pressure (calibrated)from RTC backup register
-//  double pressure_sea_level = 101325*100;
-//  double pressure_ratio = pressure / pressure_sea_level;
-  double pressure_ratio = pressure * 9.869232667160128e-4;
-  altitude = (pow(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
+  double pressure_ratio = pressure * r_pressure_sea_level;
+//  double pressure_ratio = pressure * 9.869232667160128e-4;
+  altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
 
   // calculate tilt angle
   double total_acc_r = 1 / sqrt(acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
@@ -881,10 +949,10 @@ void vSensorReadingCallback(void *argument)
 	// calculate battery voltage
   //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
   //battery_voltage = ADC1_CH0 * 0.123287671232877;
-  battery_voltage = ADC1_CH0 / 4095.0 * 3.3 * 1.5;
+  battery_voltage = adc_0 / 4095.0 * 3.3 * 1.5;
 
 	// calculate air speed
-  air_speed = DP_calculateAirSpeedComp(ADC1_CH1, pressure / 100.f, temperature / 100.f);
+  air_speed = DP_calculateAirSpeedComp(adc_1, pressure / 100.f, temperature / 100.f);
   air_speed /= 100;
 
 	// move data to sensor data container
@@ -903,6 +971,8 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.ang_x = ang_x;
   sensor_data_container.ang_y = ang_y;
   sensor_data_container.ang_z = ang_z;
+  sensor_data_container.adc_0 = adc_0;
+  sensor_data_container.adc_1 = adc_1;
   sensor_data_container.altitude = altitude;
   sensor_data_container.tilt_x = tilt_x;
   sensor_data_container.tilt_y = tilt_y;
