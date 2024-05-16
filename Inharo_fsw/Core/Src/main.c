@@ -27,6 +27,7 @@
 #include "type.h"
 #include <math.h>
 #include "converter.h"
+#include "telemetryHandler.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -719,6 +720,8 @@ void vReceiveTask(void *argument)
   	case FRAME_TYPE_RX: {
   		memset(RFdata, 0, sizeof(RFdata));
   		memcpy(RFdata, packet.data+5, packet.length-5);
+
+  		cb_init();
   		logd("RFdata:%s", RFdata);
   	}
   	}
