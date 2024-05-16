@@ -30,7 +30,7 @@ uint16_t DP_calculateAirSpeedComp(uint16_t adc_value, double static_pressure, do
 	pressure_ratio = stagnaion_pressure / static_pressure;
 
 	// calculate velocity
-	velocity = sqrt( ( powf(pressure_ratio, DP_POWER_COEFFICIENT) - 1 ) * DP_PRODUCT_COEFFICIENT / ( DP_HEAT_CAPACITY_RATIO * DP_GAS_COEFFICIENT_AIR * static_temperature ) );
+	velocity = sqrt( ( pow(pressure_ratio, DP_POWER_COEFFICIENT) - 1 ) * DP_PRODUCT_COEFFICIENT / ( DP_HEAT_CAPACITY_RATIO * DP_GAS_COEFFICIENT_AIR * static_temperature ) );
 
 	return velocity * 100;
 }
@@ -52,7 +52,7 @@ uint16_t DP_calculateAirSpeedIncomp(uint16_t adc_value, double static_pressure, 
 	return velocity*100;
 }
 
-void DP_setCalibration(uint16_t adc_value){
+void DP_calcCalibrationFromADC(uint16_t adc_value){
 	double adc_voltage;
 	// set input adc_value for zero differential pressure voltage
 	#ifdef DP_ADC_SCALE
@@ -63,6 +63,9 @@ void DP_setCalibration(uint16_t adc_value){
 	adc_voltage = adc_value * 8.219178082191780e-4;
 	#endif
 	DP_tare_voltage = adc_voltage;
+}
+void DP_setCalibrationFromDouble(double calibration_voltage){
+	DP_tare_voltage = calibration_voltage;
 }
 double DP_getCalibration(void){
 	// return calibration data for backup

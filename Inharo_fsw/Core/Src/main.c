@@ -35,9 +35,13 @@
 typedef struct{
 	// bmp390, scale: 100
 	float altitude;
+	float s_altitude;
 	int64_t temperature;
 	uint64_t pressure;
+	uint64_t s_pressure;
 	// bno055
+	double tilt_x;
+	double tilt_y;
 	double ang_x;
   double ang_y;
 	double ang_z;
@@ -50,6 +54,9 @@ typedef struct{
 	double mag_x;
 	double mag_y;
 	double mag_z;
+	// adc
+	uint16_t adc_0;
+	uint16_t adc_1;
 	// battery voltage, scale: 100(x)
 	float battery_voltage;
 	// airspeed, scale: 100(x)
@@ -78,7 +85,7 @@ typedef enum{
 /* USER CODE BEGIN PD */
 #define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
 #define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
-
+double r_pressure_sea_level = 1 / ( 101325* 100 );
 
 
 // scale 100
@@ -166,7 +173,7 @@ Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
 SensorDataContainerTypeDef sensor_data_container = {0, };
-VehicleStateTypeDef vehicle_state = {0, };
+VehicleStateTypeDef vehicle_state = VEHICLE_RESET;
 
 uint8_t IH_UART1_headerPass = 0;
 uint8_t IH_UART1_pMessage = 0;
@@ -205,6 +212,9 @@ static void _BMP390_Init(void);
 static void _BNO055_Init(void);
 static void _SD_Init(void);
 static void _Servo_Init(void);
+int Calibrate(void);
+int Backup(void);
+void BackupRecovery(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -258,6 +268,9 @@ int main(void)
   _BNO055_Init();
   _SD_Init();
   _Servo_Init();
+  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0){
+  	BackupRecovery();
+  }
 
   logi("Initialized");
   /* USER CODE END 2 */
@@ -503,13 +516,281 @@ static void _SD_Init(void){
 	}
 }
 static void _Servo_Init(void){
-	Servo_Attach(&hservo1, &htim3, TIM_CHANNEL_1);
-	Servo_Attach(&hservo2, &htim3, TIM_CHANNEL_2);
-	Servo_Attach(&hservo3, &htim3, TIM_CHANNEL_3);
+	Servo_Attach(&hservo1, &htim3, TIM_CHANNEL_1);	// heat shield deploy servo
+	Servo_Attach(&hservo2, &htim3, TIM_CHANNEL_2);	// heat shield release servo
+	Servo_Attach(&hservo3, &htim3, TIM_CHANNEL_3);	// parachute deploy servo
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
+	Servo_Write(&hservo1, 0);
+	Servo_Write(&hservo2, 0);
+	Servo_Write(&hservo3, 0);
 }
+
+int Calibrate(void){
+	bno055_calibration_data_t bno055_cal_data;
+
+	int32_t cal_zero_altitude0 = 0;
+	int32_t cal_zero_altitude1 = 0;
+	int32_t	cal_zero_velocity0 = 0;
+	int32_t	cal_zero_velocity1 = 0;
+	int32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
+	int32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
+	int32_t	cal_mag_ofst_y_mag_ofst_z = 0;
+	int32_t	cal_acc_ofst_x_acc_ofst_y = 0;
+	int32_t	cal_acc_ofst_z_reserved = 0;
+	int32_t	cal_imu_radius_mag_acc = 0;
+
+	// get bno055 calibration data
+	if(bno055_getCalibrationState().sys < 0x03) return 1;
+//	if(bno055_getCalibrationState() < 0x02) return 1;
+//	if(bno055_getCalibrationState() < 0x01) return 1;
+	bno055_cal_data = bno055_getCalibrationData();
+
+	// zero altitude calibration; simulation pressure is calibrated when first SIMP command received
+	r_pressure_sea_level = 1 / sensor_data_container.pressure;
+
+	// calibrate velocity calculation
+	DP_calcCalibrationFromADC(sensor_data_container.adc_1);
+
+	// make calibration data for RTC backup register
+	union{
+		double  val_double;
+		int32_t val_int32[2];
+	}double_and_int32;
+
+	double_and_int32.val_double = r_pressure_sea_level;
+	cal_zero_altitude0 = double_and_int32.val_int32[0];
+	cal_zero_altitude1 = double_and_int32.val_int32[1];
+
+	double_and_int32.val_double = DP_getCalibration();
+	cal_zero_velocity0 = double_and_int32.val_int32[0];
+	cal_zero_velocity1 = double_and_int32.val_int32[1];
+
+	cal_gyro_ofst_x_gyro_ofst_y = (bno055_cal_data.offset.gyro.x 	<< 16)|(bno055_cal_data.offset.gyro.y);
+	cal_gyro_ofst_z_mag_ofst_x  = (bno055_cal_data.offset.gyro.z 	<< 16)|(bno055_cal_data.offset.mag.x);
+	cal_mag_ofst_y_mag_ofst_z   = (bno055_cal_data.offset.mag.y  	<< 16)|(bno055_cal_data.offset.mag.z);
+	cal_acc_ofst_x_acc_ofst_y		= (bno055_cal_data.offset.accel.x	<< 16)|(bno055_cal_data.offset.accel.y);
+	cal_acc_ofst_z_reserved			= (bno055_cal_data.offset.accel.z	<< 16);
+	cal_imu_radius_mag_acc			= (bno055_cal_data.radius.mag			<< 16)|(bno055_cal_data.radius.accel);
+
+	// save calibration data
+  HAL_PWR_EnableBkUpAccess();
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7,		cal_zero_velocity1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8,  	cal_gyro_ofst_x_gyro_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9,  	cal_gyro_ofst_z_mag_ofst_x);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, 	cal_mag_ofst_y_mag_ofst_z);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_imu_radius_mag_acc);
+  HAL_PWR_DisableBkUpAccess();
+
+	return 0;
+}
+int Backup(void){
+	bno055_calibration_data_t bno055_cal_data;
+	uint32_t	bkp_vehicle =0;
+	uint32_t	bkp_packet_count = 0;
+	uint32_t 	cal_zero_altitude0 = 0;
+	uint32_t 	cal_zero_altitude1 = 0;
+	uint32_t 	cal_s_zero_altitude0 = 0;
+	uint32_t 	cal_s_zero_altitude1 = 0;
+	uint32_t	cal_zero_velocity0 = 0;
+	uint32_t	cal_zero_velocity1 = 0;
+	uint32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
+	uint32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
+	uint32_t	cal_mag_ofst_y_mag_ofst_z = 0;
+	uint32_t	cal_acc_ofst_x_acc_ofst_y = 0;
+	uint32_t	cal_acc_ofst_z_reserved = 0;
+	uint32_t	cal_rad_mag_rad_acc = 0;
+
+	union{
+		uint8_t 	val_uint8[4];
+		uint32_t	val_uint32;
+	}uint8_to_uint32;
+	union{
+		double 		val_double;
+		uint32_t 	val_uint32[2];
+	}double_to_uint32;
+	union{
+		int16_t 	val_int16[2];
+		uint32_t 	val_uint32;
+	}int16_to_uint32;
+	union{
+		int16_t 	val_uint16[2];
+		uint32_t 	val_uint32;
+	}uint16_to_uint32;
+
+	uint8_to_uint32.val_uint8[0] 		= 0;
+	uint8_to_uint32.val_uint8[1] 		= 0;
+	uint8_to_uint32.val_uint8[2] 		= ( uint8_t ) vehicle_state;
+//	uint8_to_uint32.val_uint8[3]	 	= ( uint8_t ) ( ( ( val_CX & 0x01 ) << 1 ) | 0x01 );
+	uint8_to_uint32.val_uint8[3] 		= 1;
+	bkp_vehicle 										= uint8_to_uint32.val_uint32;
+
+	bkp_packet_count 								= packetCount;
+
+	double_to_uint32.val_double 		= r_pressure_sea_level;
+	cal_zero_altitude0 							= double_to_uint32.val_uint32[0];
+	cal_zero_altitude1 							= double_to_uint32.val_uint32[1];
+
+//	double_to_uint32.val_double 	= r_s_pressure_sea_level;
+//	cal_s_zero_altitude0 					= double_to_uint32.val_uint32[0];
+//	cal_s_zero_altitude1 					= double_to_uint32.val_uint32[1];
+
+	double_to_uint32.val_double			= DP_getCalibration();
+	cal_zero_velocity0 							= double_to_uint32.val_uint32[0];
+	cal_zero_velocity1 							= double_to_uint32.val_uint32[1];
+
+	bno055_cal_data = bno055_getCalibrationData();
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.gyro.y;
+	cal_gyro_ofst_x_gyro_ofst_y 		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.z;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.x;
+	cal_gyro_ofst_z_mag_ofst_x  		=	int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.mag.y;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.z;
+	cal_mag_ofst_y_mag_ofst_z   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.accel.y;
+	cal_acc_ofst_x_acc_ofst_y   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.z;
+	int16_to_uint32.val_int16[1] 		= 0;
+	cal_acc_ofst_z_reserved     		= int16_to_uint32.val_uint32;
+
+	uint16_to_uint32.val_uint16[0] 	= bno055_cal_data.radius.mag;
+	uint16_to_uint32.val_uint16[1] 	= bno055_cal_data.radius.accel;
+	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
+
+	// save calibration data
+  HAL_PWR_EnableBkUpAccess();
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0,		bkp_vehicle);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1,		bkp_packet_count);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4,		cal_s_zero_altitude0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5,		cal_s_zero_altitude1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7,		cal_zero_velocity1);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8,  	cal_gyro_ofst_x_gyro_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9,  	cal_gyro_ofst_z_mag_ofst_x);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, 	cal_mag_ofst_y_mag_ofst_z);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
+  HAL_PWR_DisableBkUpAccess();
+
+	return 0;
+
+}
+void BackupRecovery(void){
+	bno055_calibration_data_t bno055_cal_data;
+	uint32_t 	bkp_vehicle;
+	uint32_t 	bkp_packet_count;
+	uint32_t 	cal_zero_altitude0;
+	uint32_t 	cal_zero_altitude1;
+	uint32_t 	cal_s_zero_altitude0;
+	uint32_t 	cal_s_zero_altitude1;
+	uint32_t	cal_zero_velocity0;
+	uint32_t	cal_zero_velocity1;
+	uint32_t	cal_gyro_ofst_x_gyro_ofst_y;
+	uint32_t	cal_gyro_ofst_z_mag_ofst_x;
+	uint32_t	cal_mag_ofst_y_mag_ofst_z;
+	uint32_t	cal_acc_ofst_x_acc_ofst_y;
+	uint32_t	cal_acc_ofst_z_reserved;
+	uint32_t	cal_rad_mag_rad_acc;
+
+	// load calibration data / backup data
+	HAL_PWR_EnableBkUpAccess();
+	bkp_vehicle 								= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
+	bkp_packet_count 						= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1);
+	cal_zero_altitude0 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
+	cal_zero_altitude1 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR3);
+	cal_s_zero_altitude0 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR4);
+	cal_s_zero_altitude1 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR5);
+	cal_zero_velocity0 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR6);
+	cal_zero_velocity1 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR7);
+	cal_gyro_ofst_x_gyro_ofst_y	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR8);
+	cal_gyro_ofst_z_mag_ofst_x 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR9);
+	cal_mag_ofst_y_mag_ofst_z 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR10);
+	cal_acc_ofst_x_acc_ofst_y 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR11);
+	cal_acc_ofst_z_reserved 		= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR12);
+	cal_rad_mag_rad_acc 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR13);
+	HAL_PWR_DisableBkUpAccess();
+
+	union{
+		uint32_t	val_uint32;
+		uint8_t 	val_uint8[4];
+	}uint32_to_uint8;
+	union{
+		uint32_t 	val_uint32[2];
+		double 		val_double;
+	}uint32_to_double;
+	union{
+		uint32_t 	val_uint32;
+		int16_t 	val_int16[2];
+	}uint32_to_int16;
+	union{
+		uint32_t 	val_uint32;
+		int16_t 	val_uint16[2];
+	}uint32_to_uint16;
+
+
+	uint32_to_uint8.val_uint32 = bkp_vehicle;
+	vehicle_state = uint32_to_uint8.val_uint8[2];
+//	val_CX = 0b00000010U & uint32_to_uint8.val_uint8[3];
+
+	packetCount = bkp_packet_count;
+
+	uint32_to_double.val_uint32[0] = cal_zero_altitude0;
+	uint32_to_double.val_uint32[1] = cal_zero_altitude1;
+	r_pressure_sea_level = uint32_to_double.val_double;
+
+	uint32_to_double.val_uint32[0] = cal_s_zero_altitude0;
+	uint32_to_double.val_uint32[1] = cal_s_zero_altitude1;
+//	r_s_pressure_sea_level = uint32_to_double.val_double;
+
+	uint32_to_double.val_uint32[0] = cal_zero_velocity0;
+	uint32_to_double.val_uint32[1] = cal_zero_velocity1;
+	DP_setCalibrationFromDouble(uint32_to_double.val_double);
+
+	uint32_to_int16.val_uint32 = cal_gyro_ofst_x_gyro_ofst_y;
+	bno055_cal_data.offset.gyro.x = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.gyro.y = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_gyro_ofst_z_mag_ofst_x;
+	bno055_cal_data.offset.gyro.z = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.mag.x = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_mag_ofst_y_mag_ofst_z;
+	bno055_cal_data.offset.mag.y = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.mag.z = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_acc_ofst_x_acc_ofst_y;
+	bno055_cal_data.offset.accel.x = uint32_to_int16.val_int16[0];
+	bno055_cal_data.offset.accel.y = uint32_to_int16.val_int16[1];
+
+	uint32_to_int16.val_uint32 = cal_acc_ofst_z_reserved;
+	bno055_cal_data.offset.accel.z = uint32_to_int16.val_int16[0];
+
+	uint32_to_uint16.val_uint32 = cal_rad_mag_rad_acc;
+	bno055_cal_data.radius.mag = uint32_to_uint16.val_uint16[0];
+	bno055_cal_data.radius.accel = uint32_to_uint16.val_uint16[1];
+
+	bno055_setCalibrationData(bno055_cal_data);
+
+	return;
+}
+
 
 /* USER CODE END 4 */
 
@@ -627,22 +908,27 @@ void vStateManagingTask(void *argument)
   	case F_ASCENT:
   		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD){
   			// PC deploy if needed
+//  			Servo_Write(&hservo1, 180);	// deploy heat shield
   			vehicle_state = F_HS_DEPLOYED;
   		}
   		break;
   	case F_HS_DEPLOYED:
   		if (altitude < VEHICLE_PC_THRESHOLD){
-  			// ToDo: implement PC deploy
+  			Servo_Write(&hservo2, 180);	// release heat shield
+  			Servo_Write(&hservo3, 180);	// deploy parachute
   			vehicle_state = F_PC_DEPLOYED;
   		}
   		break;
   	case F_PC_DEPLOYED:
   		if ((old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
   				(old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement buzz
-  			// implement CX OFF
+  			// ToDo: implement CX OFF
+  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   			vehicle_state = F_LANDED;
   		}
+  		break;
+  	case F_LANDED:
+  		HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   		break;
   	case S_LAUNCH_WAIT:
   		if (s_altitude > VEHICLE_ASCENT_THRESHOLD) {
@@ -652,25 +938,30 @@ void vStateManagingTask(void *argument)
   	case S_ASCENT:
   		if (s_max_altitude - s_altitude > VEHICLE_HS_THRESHOLD){
   			// PC deploy if needed
+//  			Servo_Write(&hservo1, 180);	// deploy heat shield
   			vehicle_state = S_HS_DEPLOYED;
   		}
   		break;
   	case S_HS_DEPLOYED:
   		if (s_altitude < VEHICLE_PC_THRESHOLD){
-  			// ToDo: implement PC deploy
+  			Servo_Write(&hservo2, 180);	// release heat shield
+  			Servo_Write(&hservo3, 180);	// deploy parachute
   			vehicle_state = S_PC_DEPLOYED;
   		}
   		break;
   	case S_PC_DEPLOYED:
   		if ((s_old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
   				(s_old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement buzz
-  			// implement CX OFF
+  			// ToDo: implement CX OFF
+  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   			vehicle_state = S_LANDED;
   		}
   		break;
+  	case S_LANDED:
+			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+			break;
   	default:
-  		// VEHICLE_RESET, F_LANDED, SIM_ENABLED, S_LANDED
+  		// VEHICLE_RESET, SIM_ENABLED
   		// do nothing, basically...
   		// doing commanded task will be implemented in vRecieveTask(); function
   		break;
@@ -801,7 +1092,8 @@ void vSensorReadingCallback(void *argument)
 	double rot_x, rot_y, rot_z;
 	double mag_x, mag_y, mag_z;
 	double ang_x, ang_y, ang_z;
-	int16_t ADC1_CH0, ADC1_CH1;
+	double tilt_x, tilt_y;
+	uint16_t adc_0, adc_1;
 	float altitude;
 	float battery_voltage;
 	float air_speed;
@@ -831,12 +1123,12 @@ void vSensorReadingCallback(void *argument)
 	// read ADC1 CH0
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1, 50);
-	ADC1_CH0 = HAL_ADC_GetValue(&hadc1);
+	adc_0 = HAL_ADC_GetValue(&hadc1);
 
 	// read ADC1 CH1
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_PollForConversion(&hadc1, 50);
-	ADC1_CH1 = HAL_ADC_GetValue(&hadc1);
+	adc_1 = HAL_ADC_GetValue(&hadc1);
 
 	// calculate altitude
   /*
@@ -855,18 +1147,22 @@ void vSensorReadingCallback(void *argument)
   	 * T1: temperature, sea level
   	 */
   //ToDo: get sea level pressure (calibrated)from RTC backup register
-//  double pressure_sea_level = 101325*100;
-//  double pressure_ratio = pressure / pressure_sea_level;
-  double pressure_ratio = pressure * 9.869232667160128e-4;
+  double pressure_ratio = pressure * r_pressure_sea_level;
+//  double pressure_ratio = pressure * 9.869232667160128e-4;
   altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
+
+  // calculate tilt angle
+  double total_acc_r = 1 / sqrt(acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
+  tilt_x = asin( acc_x * total_acc_r );
+  tilt_y = asin( acc_y * total_acc_r );
 
 	// calculate battery voltage
   //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
   //battery_voltage = ADC1_CH0 * 0.123287671232877;
-  battery_voltage = ADC1_CH0 / 4095.0 * 3.3 * 1.5;
+  battery_voltage = adc_0 / 4095.0 * 3.3 * 1.5;
 
 	// calculate air speed
-  air_speed = DP_calculateAirSpeedComp(ADC1_CH1, pressure / 100.f, temperature / 100.f);
+  air_speed = DP_calculateAirSpeedComp(adc_1, pressure / 100.f, temperature / 100.f);
   air_speed /= 100;
 
 	// move data to sensor data container
@@ -885,7 +1181,11 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.ang_x = ang_x;
   sensor_data_container.ang_y = ang_y;
   sensor_data_container.ang_z = ang_z;
+  sensor_data_container.adc_0 = adc_0;
+  sensor_data_container.adc_1 = adc_1;
   sensor_data_container.altitude = altitude;
+  sensor_data_container.tilt_x = tilt_x;
+  sensor_data_container.tilt_y = tilt_y;
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
   sensor_data_container.altitude_updated_flag = 1;
