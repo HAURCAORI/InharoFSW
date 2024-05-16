@@ -37,6 +37,8 @@ typedef struct{
 	int64_t temperature;
 	uint64_t pressure;
 	// bno055
+	double tilt_x;
+	double tilt_y;
 	double ang_x;
   double ang_y;
 	double ang_z;
@@ -502,12 +504,15 @@ static void _SD_Init(void){
 	}
 }
 static void _Servo_Init(void){
-	Servo_Attach(&hservo1, &htim3, TIM_CHANNEL_1);
-	Servo_Attach(&hservo2, &htim3, TIM_CHANNEL_2);
-	Servo_Attach(&hservo3, &htim3, TIM_CHANNEL_3);
+	Servo_Attach(&hservo1, &htim3, TIM_CHANNEL_1);	// heat shield deploy servo
+	Servo_Attach(&hservo2, &htim3, TIM_CHANNEL_2);	// heat shield release servo
+	Servo_Attach(&hservo3, &htim3, TIM_CHANNEL_3);	// parachute deploy servo
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
+	Servo_Write(&hservo1, 0);
+	Servo_Write(&hservo2, 0);
+	Servo_Write(&hservo3, 0);
 }
 
 /* USER CODE END 4 */
@@ -626,22 +631,27 @@ void vStateManagingTask(void *argument)
   	case F_ASCENT:
   		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD){
   			// PC deploy if needed
+//  			Servo_Write(&hservo1, 180);	// deploy heat shield
   			vehicle_state = F_HS_DEPLOYED;
   		}
   		break;
   	case F_HS_DEPLOYED:
   		if (altitude < VEHICLE_PC_THRESHOLD){
-  			// ToDo: implement PC deploy
+  			Servo_Write(&hservo2, 180);	// release heat shield
+  			Servo_Write(&hservo3, 180);	// deploy parachute
   			vehicle_state = F_PC_DEPLOYED;
   		}
   		break;
   	case F_PC_DEPLOYED:
   		if ((old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
   				(old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement buzz
-  			// implement CX OFF
+  			// ToDo: implement CX OFF
+  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   			vehicle_state = F_LANDED;
   		}
+  		break;
+  	case F_LANDED:
+  		HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   		break;
   	case S_LAUNCH_WAIT:
   		if (s_altitude > VEHICLE_ASCENT_THRESHOLD) {
@@ -651,25 +661,30 @@ void vStateManagingTask(void *argument)
   	case S_ASCENT:
   		if (s_max_altitude - s_altitude > VEHICLE_HS_THRESHOLD){
   			// PC deploy if needed
+//  			Servo_Write(&hservo1, 180);	// deploy heat shield
   			vehicle_state = S_HS_DEPLOYED;
   		}
   		break;
   	case S_HS_DEPLOYED:
   		if (s_altitude < VEHICLE_PC_THRESHOLD){
-  			// ToDo: implement PC deploy
+  			Servo_Write(&hservo2, 180);	// release heat shield
+  			Servo_Write(&hservo3, 180);	// deploy parachute
   			vehicle_state = S_PC_DEPLOYED;
   		}
   		break;
   	case S_PC_DEPLOYED:
   		if ((s_old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
   				(s_old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement buzz
-  			// implement CX OFF
+  			// ToDo: implement CX OFF
+  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
   			vehicle_state = S_LANDED;
   		}
   		break;
+  	case S_LANDED:
+			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+			break;
   	default:
-  		// VEHICLE_RESET, F_LANDED, SIM_ENABLED, S_LANDED
+  		// VEHICLE_RESET, SIM_ENABLED
   		// do nothing, basically...
   		// doing commanded task will be implemented in vRecieveTask(); function
   		break;
@@ -798,6 +813,7 @@ void vSensorReadingCallback(void *argument)
 	double rot_x, rot_y, rot_z;
 	double mag_x, mag_y, mag_z;
 	double ang_x, ang_y, ang_z;
+	double tilt_x, tilt_y;
 	int16_t ADC1_CH0, ADC1_CH1;
 	float altitude;
 	float battery_voltage;
@@ -855,7 +871,12 @@ void vSensorReadingCallback(void *argument)
 //  double pressure_sea_level = 101325*100;
 //  double pressure_ratio = pressure / pressure_sea_level;
   double pressure_ratio = pressure * 9.869232667160128e-4;
-  altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
+  altitude = (pow(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
+
+  // calculate tilt angle
+  double total_acc_r = 1 / sqrt(acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
+  tilt_x = asin( acc_x * total_acc_r );
+  tilt_y = asin( acc_y * total_acc_r );
 
 	// calculate battery voltage
   //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
@@ -883,6 +904,8 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.ang_y = ang_y;
   sensor_data_container.ang_z = ang_z;
   sensor_data_container.altitude = altitude;
+  sensor_data_container.tilt_x = tilt_x;
+  sensor_data_container.tilt_y = tilt_y;
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
   sensor_data_container.altitude_updated_flag = 1;

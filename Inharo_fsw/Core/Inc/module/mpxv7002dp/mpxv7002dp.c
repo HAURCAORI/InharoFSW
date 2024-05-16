@@ -30,7 +30,7 @@ uint16_t DP_calculateAirSpeedComp(uint16_t adc_value, double static_pressure, do
 	pressure_ratio = stagnaion_pressure / static_pressure;
 
 	// calculate velocity
-	velocity = sqrt( ( powf(pressure_ratio, DP_POWER_COEFFICIENT) - 1 ) * DP_PRODUCT_COEFFICIENT / ( DP_HEAT_CAPACITY_RATIO * DP_GAS_COEFFICIENT_AIR * static_temperature ) );
+	velocity = sqrt( ( pow(pressure_ratio, DP_POWER_COEFFICIENT) - 1 ) * DP_PRODUCT_COEFFICIENT / ( DP_HEAT_CAPACITY_RATIO * DP_GAS_COEFFICIENT_AIR * static_temperature ) );
 
 	return velocity * 100;
 }
