@@ -1087,11 +1087,25 @@ CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg){
 	return CMD_SIMP;
 }
 void CMD_excuteCX_ON(void){
+	uint32_t bkpdata;
+  HAL_PWR_EnableBkUpAccess();
+	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
+	bkpdata |= ( 1U << 1 );
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
+  HAL_PWR_DisableBkUpAccess();
+
 	// ToDo: implement execution code
 	logd("not implemented.\n");
 	return;
 }
 void CMD_excuteCX_OFF(void){
+	uint32_t bkpdata;
+  HAL_PWR_EnableBkUpAccess();
+	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
+	bkpdata &= ~( 1U << 1 );
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
+  HAL_PWR_DisableBkUpAccess();
+
 	// ToDo: implement execution code
 	logd("not implemented.\n");
 	return;
@@ -1124,21 +1138,29 @@ void CMD_excuteST_GPS(void){
 }
 void CMD_excuteSIM_ENABLE(void){
 	// ToDo: implement execution code
+	// if state is flight: deny
+	// if state is simulation: do nothing
+	// else: change state to SIM_ENABLED
 	logd("not implemented.\n");
 	return;
 }
 void CMD_excuteSIM_ACTIVATE(void){
 	// ToDo: implement execution code
+	// if state is SIM_ENABLED: change it to S_LAUNCH_WAIT
+	// else: do nothing
 	logd("not implemented.\n");
 	return;
 }
 void CMD_excuteSIM_DISABLE(void){
 	// ToDo: implement execution code
+	// if state is one of simulation mode: change it to VEHICLE_RESET
 	logd("not implemented.\n");
 	return;
 }
 void CMD_excuteSIMP(int argument){
 	// ToDo: implement execution code
+	// if this is the first simp data after sim_activate: set simulated zero altitude calibration
+	// else: change simulated pressure and change simulated altitude and raise simulated altitude update flag
 	logd("not implemented.\n");
 	return;
 }
@@ -1210,10 +1232,12 @@ void CMD_excuteREL_HS(void){
 }
 void CMD_excuteINIT(void){
 	// ToDo: implement execution code
+	// if state is VEHICLE_RESET: change it to F_LAUNCH_WAIT
 	logd("not implemented.\n");
 	return;
 }
 void CMD_excuteRESET(void){
+	// ToDo: implement state transfer to vehicle_reset state
 	Backup();
 	NVIC_SystemReset();
 	return;
@@ -1572,9 +1596,8 @@ void vSensorReadingCallback(void *argument)
   	 * p1: pressure, sea level
   	 * T1: temperature, sea level
   	 */
-  //ToDo: get sea level pressure (calibrated)from RTC backup register
+
   double pressure_ratio = pressure * r_pressure_sea_level;
-//  double pressure_ratio = pressure * 9.869232667160128e-4;
   altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
 
   // calculate tilt angle
@@ -1592,7 +1615,6 @@ void vSensorReadingCallback(void *argument)
   air_speed /= 100;
 
 	// move data to sensor data container
-  // ToDo: block other task and move data
   sensor_data_container.pressure = pressure;
   sensor_data_container.temperature = temperature;
   sensor_data_container.acc_x = acc_x;
