@@ -27,7 +27,7 @@
 #include "type.h"
 #include <math.h>
 #include "converter.h"
-#include "telemetryHandler.h"
+#include "circularBuffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -85,7 +85,7 @@ typedef enum{
 /* USER CODE BEGIN PD */
 #define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
 #define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
-double r_pressure_sea_level = 1 / ( 101325* 100 );
+double r_pressure_sea_level = 1.0 / ( 101325.0 * 100.0 );
 
 
 // scale 100
@@ -138,6 +138,13 @@ const osThreadAttr_t Debug_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for TransmitLoop */
+osThreadId_t TransmitLoopHandle;
+const osThreadAttr_t TransmitLoop_attributes = {
+  .name = "TransmitLoop",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for SensorReading */
 osTimerId_t SensorReadingHandle;
 const osTimerAttr_t SensorReading_attributes = {
@@ -182,12 +189,14 @@ uint8_t IH_UART1_buf[IH_UART1_MAX_LENGTH] ={0,};
 
 
 // Communication definition;
-uint32_t packetCount = 0;
+uint32_t packetCount = 1;
 uint8_t uart1_rx_buffer[1];
 uint8_t uart3_rx_buffer[1];
 uint32_t receive_tick;
 XBEE_Packet_Buffer xbee_rx_buffer;
 GPS_Packet_Buffer gps_rx_buffer;
+TLE_Circular_Buffer cb_tle;
+uint16_t ack_packet = 0;
 
 // XBee Sample
 uint8_t tx_packet[PACKET_SIZE];
@@ -204,6 +213,7 @@ void vGPSTask(void *argument);
 void vStateManagingTask(void *argument);
 void vReceiveTask(void *argument);
 void vDebugTask(void *argument);
+void vTransmitLoopTask(void *argument);
 void vSensorReadingCallback(void *argument);
 void vTransmitCallback(void *argument);
 
@@ -272,6 +282,8 @@ int main(void)
   	BackupRecovery();
   }
 
+  cb_init(&cb_tle, TLE_Circular_Buffer_Size, sizeof(Telemetry));
+
   logi("Initialized");
   /* USER CODE END 2 */
 
@@ -302,8 +314,8 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-  osTimerStart(SensorReadingHandle, 1000);
-  osTimerStart(TransmitHandle, 100);
+  osTimerStart(SensorReadingHandle, 500);
+  osTimerStart(TransmitHandle, 900);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -325,6 +337,9 @@ int main(void)
 
   /* creation of Debug */
   DebugHandle = osThreadNew(vDebugTask, NULL, &Debug_attributes);
+
+  /* creation of TransmitLoop */
+  TransmitLoopHandle = osThreadNew(vTransmitLoopTask, NULL, &TransmitLoop_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -357,7 +372,6 @@ int main(void)
 
 
 /* USER CODE BEGIN 4 */
-//uint8_t buffer[14] = {};
 
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -542,13 +556,13 @@ int Calibrate(void){
 	int32_t	cal_imu_radius_mag_acc = 0;
 
 	// get bno055 calibration data
-	if(bno055_getCalibrationState().sys < 0x03) return 1;
+	//if(bno055_getCalibrationState().sys < 0x03) return 1; // 주석 �??���?
 //	if(bno055_getCalibrationState() < 0x02) return 1;
 //	if(bno055_getCalibrationState() < 0x01) return 1;
 	bno055_cal_data = bno055_getCalibrationData();
 
 	// zero altitude calibration; simulation pressure is calibrated when first SIMP command received
-	r_pressure_sea_level = 1 / sensor_data_container.pressure;
+	r_pressure_sea_level = 1.0 / sensor_data_container.pressure;
 
 	// calibrate velocity calculation
 	DP_calcCalibrationFromADC(sensor_data_container.adc_1);
@@ -792,6 +806,53 @@ void BackupRecovery(void){
 }
 
 
+void SendTelemetry(Telemetry* tle) {
+	// packet header
+	tx_packet[0] = 0x7E;
+
+	uint16_t length = TELEMETRY_PACKET_SIZE - 4;
+	tx_packet[1] = length >> 8;
+	tx_packet[2] = (uint8_t) length;
+	tx_packet[3] = FRAME_TYPE_TX;
+	tx_packet[4] = 0x01;
+	tx_packet[5] = FRAME_ADDRESS_HIGH;
+	tx_packet[6] = FRAME_ADDRESS_LOW;
+	tx_packet[7] = 0;
+	memcpy(&tx_packet[8], tle, sizeof(Telemetry));
+
+	// checksum
+	uint16_t checksum = 0;
+	for (uint8_t i = 3; i < TELEMETRY_PACKET_SIZE - 1; i++) {
+		checksum += tx_packet[i];
+	}
+	checksum = 0xFF - ((uint8_t) checksum);
+	tx_packet[TELEMETRY_PACKET_SIZE - 1] = checksum;
+
+	// send
+	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 50);
+}
+
+
+void RFParsing(uint8_t* data, size_t length) {
+	if(length < 11) { return; }
+	uint32_t cmd = 0;
+	uint32_t teamID = 0;
+
+	if(data[3] != ',') { return; }
+	if(data[8] != ',') { return; }
+
+	memcpy(&cmd, data,3);
+	memcpy(&teamID, data+4,4);
+
+	if(teamID != RX_HEADER_TEAM_ID) { return; }
+	if(cmd == RX_HEADER_CMD) {
+		logd("data");
+	} else if (cmd == RX_HEADER_ACK) {
+		ack_packet = data[9] << 8;
+		ack_packet |= data[10];
+		osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_ACK);
+	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_vMainTask */
@@ -847,6 +908,7 @@ void vGPSTask(void *argument)
   	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_GPS, osFlagsWaitAny, osWaitForever);
 
   	// Validation check
+  	if(flags & osFlagsError) { continue; }
   	if(!(flags & EVENT_RECEIVE_GPS)){ continue; }
   	if(!(flags & EVENT_RECEIVE_SUCCESS)) { continue; }
 		osSemaphoreAcquire(ReceiveSemaphoreHandle, 10);
@@ -861,7 +923,6 @@ void vGPSTask(void *argument)
 		switch(sentence) {
 		case GPS_SENTENCE_GGA: {
 			GPS_NMEA_parseGGA(packet.data, &gps_data);
-			//logd("GPS/%s/%s",packet.deviceID, packet.data);
 		}
 		}
 	}
@@ -993,6 +1054,7 @@ void vReceiveTask(void *argument)
   	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_XBEE, osFlagsWaitAny, osWaitForever);
 
   	// Validation Check;
+  	if(flags & osFlagsError) { continue; }
   	if(!(flags & EVENT_RECEIVE_XBEE)) { continue; }
   	if(!(flags & EVENT_RECEIVE_SUCCESS)) { continue; }
 
@@ -1011,9 +1073,7 @@ void vReceiveTask(void *argument)
   	case FRAME_TYPE_RX: {
   		memset(RFdata, 0, sizeof(RFdata));
   		memcpy(RFdata, packet.data+5, packet.length-5);
-
-  		cb_init();
-  		logd("RFdata:%s", RFdata);
+  		RFParsing(RFdata, packet.length-5);
   	}
   	}
   }
@@ -1032,11 +1092,11 @@ void vDebugTask(void *argument)
   /* USER CODE BEGIN vDebugTask */
   /* Infinite loop */
 	uint32_t event_flag;
-	uint32_t buffer;
 	uint16_t cmd = 0;
-	HAL_StatusTypeDef status;
 	for (;;) {
 		event_flag = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_USB, osFlagsWaitAny, osWaitForever);
+		if(event_flag & osFlagsError) { continue; }
+
 		if (event_flag & EVENT_RECEIVE_USB) {
 			Buzzer_Once();
 			memcpy(&cmd, usb_rx_buffer.buffer, DEBUG_CMD_SIZE);
@@ -1048,15 +1108,18 @@ void vDebugTask(void *argument)
 				osDelay(100);
 				Buzzer_Once();
 				break;
-				/*
-			case DEBUG_CMD_CALIBRATION:
-				status = BMP390_ReadCalibration();
-				if (status == HAL_OK) {
-					logi("BMP390 CAL Complete.");
-				} else {
-					logi("BMP390 CAL Fail.");
-				}
+			case DEBUG_CMD_SERVO_180:
+				logd("Servo 180");
+				Servo_Write(&hservo2, 180);
 				break;
+			case DEBUG_CMD_SERVO_0:
+				logd("Servo 0");
+				Servo_Write(&hservo2, 0);
+				break;
+			case DEBUG_CMD_CALIBRATION:
+				logd("%d", Calibrate());
+				break;
+				/*
 			case DEBUG_CMD_PRESSURE:
 				logd("Pressure");
 
@@ -1079,6 +1142,58 @@ void vDebugTask(void *argument)
 		}
 	}
   /* USER CODE END vDebugTask */
+}
+
+/* USER CODE BEGIN Header_vTransmitLoopTask */
+/**
+* @brief Function implementing the TransmitLoop thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_vTransmitLoopTask */
+void vTransmitLoopTask(void *argument)
+{
+  /* USER CODE BEGIN vTransmitLoopTask */
+  /* Infinite loop */
+	Telemetry tle;
+	uint32_t flags;
+  for(;;)
+  {
+  	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_PUSH, osFlagsWaitAny, 1000);
+  	if(flags & osFlagsError) { continue; }
+  	if(!(flags & EVENT_RECEIVE_PUSH)) { continue; }
+
+  	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 0) != osOK) { continue; }
+
+  	if(cb_value(&cb_tle, &tle) != cb_ok) {
+  		osSemaphoreRelease(TransmitSemaphoreHandle);
+  		continue;
+  	}
+
+  	SendTelemetry(&tle);
+
+  	flags = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_ACK, osFlagsWaitAny, 200);
+
+  	if(!(flags & osFlagsError) && (flags & EVENT_RECEIVE_ACK)) {
+  		while (1) {
+  			cb_value(&cb_tle, &tle);
+  			if(tle.packet_count <= ack_packet) {
+  				if(cb_pop(&cb_tle, &tle) != osOK)
+  					break;
+  			} else {
+  				break;
+  			}
+  		}
+
+  		if(cb_count(&cb_tle) > 0) {
+  			osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_PUSH);
+  		}
+  	}
+
+  	osSemaphoreRelease(TransmitSemaphoreHandle);
+
+  }
+  /* USER CODE END vTransmitLoopTask */
 }
 
 /* vSensorReadingCallback function */
@@ -1196,6 +1311,8 @@ void vSensorReadingCallback(void *argument)
 void vTransmitCallback(void *argument)
 {
   /* USER CODE BEGIN vTransmitCallback */
+
+	// Making Telemetry
 	UpdateTime();
 	telemetry.team_id = 1234;
 	telemetry.hours = sTime.Hours;
@@ -1219,31 +1336,16 @@ void vTransmitCallback(void *argument)
 	telemetry.GPS_latitude = gps_data.latitude;
 	telemetry.GPS_longitude = gps_data.longitude;
 	telemetry.GPS_sats = gps_data.satellites;
-	telemetry.tilt_x = sensor_data_container.ang_z; // Axis Change
-	telemetry.tilt_y = sensor_data_container.ang_y;
+	telemetry.tilt_x = sensor_data_container.tilt_x*180/PI; // Axis Change
+	telemetry.tilt_y = sensor_data_container.tilt_y*180/PI;
 	telemetry.rot_z = sensor_data_container.rot_z;
 	telemetry.cmd_echo = 0xFF;
 
-	//packet header
-	tx_packet[0] = 0x7E;
+	// Push Telemetry
+	cb_push(&cb_tle, &telemetry);
+	osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_PUSH);
 
-	uint16_t length = TELEMETRY_PACKET_SIZE-4;
-	tx_packet[1] = length >> 8;
-	tx_packet[2] = (uint8_t) length;
-	tx_packet[3] = FRAME_TYPE_TX;
-	tx_packet[4] = 0x01;
-	tx_packet[5] = FRAME_ADDRESS_HIGH;
-	tx_packet[6] = FRAME_ADDRESS_LOW;
-	tx_packet[7] = 0;
-	memcpy(&tx_packet[8], &telemetry, sizeof(telemetry));
-
-	uint16_t checksum = 0;
-	for(uint8_t i = 3; i < TELEMETRY_PACKET_SIZE-1; i++) {
-		checksum += tx_packet[i];
-	}
-	checksum = 0xFF - ((uint8_t) checksum);
-	tx_packet[TELEMETRY_PACKET_SIZE-1] = checksum;
-	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 50);
+	logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
   /* USER CODE END vTransmitCallback */
 }
 
