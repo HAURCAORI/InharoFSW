@@ -215,7 +215,7 @@ Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
 // System Command Variable
-uint8_t isCommunication = IH_CX_OFF;
+uint8_t isCommunication = IH_CX_ON;
 uint8_t isTimeSetGPS = FALSE;
 
 //
@@ -265,12 +265,10 @@ static void _Servo_Init(void);
 int Calibrate(void);
 void Backup(void);
 void BackupRecovery(void);
-CMD_CommandCaseTypeDef CMD_parseCommandMessage(uint8_t *message, int *pArg);
-CMD_CommandCaseTypeDef CMD_parseTime(uint8_t *message, int *pArg);
 CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg);
 void CMD_excuteCX_ON(void);
 void CMD_excuteCX_OFF(void);
-void CMD_excuteST_TIME(int argument);
+void CMD_excuteST_TIME(const uint8_t *argument);
 void CMD_excuteST_GPS(void);
 void CMD_excuteSIM_ENABLE(void);
 void CMD_excuteSIM_ACTIVATE(void);
@@ -279,7 +277,6 @@ void CMD_excuteSIMP(int argument);
 void CMD_excuteCAL(void);
 void CMD_excuteBCN_ON(void);
 void CMD_excuteBCN_OFF(void);
-void CMD_excuteDEP_HS(void);
 void CMD_excuteDEP_PC(void);
 void CMD_excuteREL_HS(void);
 void CMD_excuteINIT(void);
@@ -339,7 +336,7 @@ int main(void)
   _SD_Init();
   _Servo_Init();
   if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0){
-  	BackupRecovery();
+  	//BackupRecovery();
   }
 
   cb_init(&cb_tle, TLE_Circular_Buffer_Size, sizeof(Telemetry));
@@ -615,7 +612,7 @@ int Calibrate(void){
 	int32_t	cal_imu_radius_mag_acc = 0;
 
 	// get bno055 calibration data
-	//if(bno055_getCalibrationState().sys < 0x03) return 1; // 주석 �??���?
+	//if(bno055_getCalibrationState().sys < 0x03) return 1; // 주석  ??   ?
 //	if(bno055_getCalibrationState() < 0x02) return 1;
 //	if(bno055_getCalibrationState() < 0x01) return 1;
 	bno055_cal_data = bno055_getCalibrationData();
@@ -863,80 +860,6 @@ void BackupRecovery(void){
 
 	return;
 }
-void CMD_commandHandler(uint8_t *message){
-	int argument;
-	CMD_CommandCaseTypeDef ret;
-
-	ret = CMD_parseCommandMessage(message, &argument);
-	switch(ret){
-	case CMD_ERR:
-		loge("unknown command parser error, possibly a null pointer error. \n");
-		break;
-	case CMD_ERR_ARG:
-		loge("wrong command argument error.\n");
-		break;
-	case CMD_ERR_COM:
-		loge("wrong command error.\n");
-		break;
-	case CMD_CX_ON:
-		CMD_excuteCX_ON();
-		break;
-	case CMD_CX_OFF:
-		CMD_excuteCX_OFF();
-		break;
-	case CMD_ST_TIME:
-		CMD_excuteST_TIME(argument);
-		break;
-	case CMD_ST_GPS:
-		CMD_excuteST_GPS();
-		break;
-	case CMD_SIM_ENABLE:
-		CMD_excuteSIM_ENABLE();
-		break;
-	case CMD_SIM_ACTIVATE:
-		CMD_excuteSIM_ACTIVATE();
-		break;
-	case CMD_SIM_DISABLE:
-		CMD_excuteSIM_DISABLE();
-		break;
-	case CMD_SIMP:
-		CMD_excuteSIMP(argument);
-		break;
-	case CMD_CAL:
-		CMD_excuteCAL();
-		break;
-	case CMD_BCN_ON:
-		CMD_excuteBCN_ON();
-		break;
-	case CMD_BCN_OFF:
-		CMD_excuteBCN_OFF();
-		break;
-	case CMD_DEP_HS:
-		CMD_excuteDEP_HS();
-		break;
-	case CMD_DEP_PC:
-		CMD_excuteDEP_PC();
-		break;
-	case CMD_REL_HS:
-		CMD_excuteREL_HS();
-		break;
-	case CMD_TEST:
-		logd("CMD_TEST not implemented yet.\n");
-		break;
-	case CMD_INIT:
-		CMD_excuteINIT();
-		break;
-	case CMD_RESET:
-		CMD_excuteRESET();
-		break;
-	default:
-		// never occurs
-		Error_Handler();
-		break;
-	}
-}
-CMD_CommandCaseTypeDef CMD_parseCommandMessage(uint8_t *message, int *pArg){
-	uint8_t *temp;
 
 
 void SendTelemetry(Telemetry* tle) {
@@ -962,32 +885,39 @@ void SendTelemetry(Telemetry* tle) {
 	tx_packet[TELEMETRY_PACKET_SIZE - 1] = checksum;
 
 	// send
-	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 50);
+	HAL_UART_Transmit(&huart3, tx_packet, sizeof(tx_packet), 100);
 }
 
-
-void RFParsing(uint8_t* data, size_t length) {
-	if(length < 11) { return; }
+void RFParsing(uint8_t *data, size_t length) {
+	if (length < 11) {
+		return;
+	}
 	uint32_t cmd = 0;
 	uint32_t teamID = 0;
 
-	if(data[3] != ',') { return; }
-	if(data[8] != ',') { return; }
+	if (data[3] != ',') {
+		return;
+	}
+	if (data[8] != ',') {
+		return;
+	}
 
-	memcpy(&cmd, data,3);
-	memcpy(&teamID, data+4,4);
+	memcpy(&cmd, data, 3);
+	memcpy(&teamID, data + 4, 4);
 
-	if(teamID != RX_HEADER_TEAM_ID) { return; }
-	if(cmd == RX_HEADER_CMD) {
+	if (teamID != RX_HEADER_TEAM_ID) {
+		return;
+	}
+	if (cmd == RX_HEADER_CMD) {
 		uint8_t command[8];
 		uint8_t argument[20];
 		uint8_t start = 8; // second comma position
-		memset(command,0,sizeof(command));
-		memset(argument,0,sizeof(argument));
+		memset(command, 0, sizeof(command));
+		memset(argument, 0, sizeof(argument));
 
 		//Parsing third field
-		for(int i = 9; i < length; i++) {
-			if(data[i] == ',') {
+		for (int i = 9; i < length; i++) {
+			if (data[i] == ',') {
 				memcpy(command, data + start + 1, i - start - 1);
 				start = i;
 			}
@@ -997,76 +927,103 @@ void RFParsing(uint8_t* data, size_t length) {
 		memcpy(argument, data + start + 1, length - start - 1);
 
 		uint64_t Icommand = 0;
-		RTC_TimeTypeDef time = {0};
+
+		RTC_TimeTypeDef time = { 0 };
 		uint8_t btemp[2];
 		uint8_t vtemp;
 
-		memcpy(&Icommand, command,8);
-		switch(Icommand) {
+		memcpy(&Icommand, command, 8);
+		switch (Icommand) {
 		case RX_CMD_CX: {
-			if(WeakCharCompare(argument, "ON")) {
-				logi("CMD_CX_ON");
+			if (WeakCharCompare(argument, "ON")) {
 				isCommunication = IH_CX_ON;
+				//CMD_excuteCX_ON();
 			} else {
-				logi("CMD_CX_OFF");
 				isCommunication = IH_CX_OFF;
+				//CMD_excuteCX_OFF();
 			}
 			break;
 		}
+
 		case RX_CMD_ST: {
-			if(WeakCharCompare(argument, "GPS")) {
-				logi("CMD_SET_GPS_TIME");
+			if (WeakCharCompare(argument, "GPS")) {
+				//CMD_excuteST_GPS();
 				isTimeSetGPS = TRUE;
 			} else {
-				logi("CMD_SET_UTC_TIME");
-				// hours
-				memcpy(btemp, argument, 2);
-				vtemp = (uint8_t)atoi(btemp);
-				if (vtemp > 24) break;
-				time.Hours = vtemp;
+				//CMD_excuteST_TIME(argument);
 
-				// minutes
-				memcpy(btemp, argument + 3, 2);
-				vtemp = (uint8_t) atoi(btemp);
-				if (vtemp > 60) break;
-				time.Minutes = vtemp;
+					// hours
+					memcpy(btemp, argument, 2);
+					vtemp = atoi((char*) btemp);
+					if (vtemp > 24) return;
+					time.Hours = vtemp;
 
-				// seconds
-				memcpy(btemp, argument + 6, 2);
-				vtemp = (uint8_t) atoi(btemp);
-				if (vtemp > 60) break;
-				time.Seconds = vtemp;
+					// minutes
+					memcpy(btemp, argument + 3, 2);
+					vtemp = atoi((char*) btemp);
+					if (vtemp > 60) return;
+					time.Minutes = vtemp;
 
-				HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
-			}
-			break;
-		}
-		case RX_CMD_CAL: {
-			logi("CMD_CAL");
-			Calibrate();
-			break;
-		}
-		case RX_CMD_SIM: {
-			if(WeakCharCompare(argument, "ENABLE")) {
-				logi("CMD_SIM_ENABLE");
+					// seconds
+					memcpy(btemp, argument + 6, 2);
+					vtemp = atoi((char*) btemp);
+					if (vtemp > 60) return;
+					time.Seconds = vtemp;
+
+					HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
 			}
 			break;
 		}
 		case RX_CMD_BCN: {
+					if(WeakCharCompare(argument, "ON")) {
+						HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+					} else if(WeakCharCompare(argument, "OFF")) {
+						HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
+					}
+					break;
+				}
 
+		case RX_CMD_CAL: {
+			Calibrate();
 			break;
 		}
-		case RX_CMD_REL: {
+		/*
+		case RX_CMD_SIM: {
+			if (WeakCharCompare(argument, "ENABLE")) {
+				CMD_excuteSIM_ENABLE();
+			} else if(WeakCharCompare(argument, "DISABLE")) {
+				CMD_excuteSIM_DISABLE();
+			} else if(WeakCharCompare(argument, "ACTIVATE")) {
+				CMD_excuteSIM_ACTIVATE();
+			}
+			break;
+		}
 
+		case RX_CMD_REL: {
+			if(WeakCharCompare(argument, "HS")) {
+				CMD_excuteREL_HS();
+			}
 			break;
 		}
 		case RX_CMD_DEP: {
-
+			if(WeakCharCompare(argument, "PC")) {
+				CMD_excuteDEP_PC();
+			}
 			break;
 		}
+		case RX_CMD_RESET: {
+			CMD_excuteRESET();
+			break;
+		}
+		case RX_CMD_INIT: {
+			CMD_excuteINIT();
+			break;
+		}
+		*/
 		default:
 			break;
 		}
+
 
 	} else if (cmd == RX_HEADER_ACK) {
 		ack_packet = data[9] << 8;
@@ -1074,164 +1031,20 @@ void RFParsing(uint8_t* data, size_t length) {
 		osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_ACK);
 	}
 }
-	if (message == NULL || pArg == NULL){
-		return CMD_ERR;
-	}
-	if (strncmp(message, "CMD,2036,", 9) != 0){
-		// invalid command
-		return CMD_ERR;
-	}
-	// the message contains "CMD,2036," phrase, so it is ok to strtok() twice
-	temp = strtok(message, ",");
-	temp = strtok(NULL, ",");
 
-	// from now on, temp may point to NULL
-	temp = strtok(NULL, ",");
-	if (temp == 0){
-		return CMD_ERR;
-	}
-
-	else if (strcmp(temp, "CX") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;	// invalid command
-
-		if (strcmp(temp, "ON")) return CMD_CX_ON;
-		if (strcmp(temp, "OFF")) return CMD_CX_OFF;
-
-		return CMD_ERR_ARG;	// no such argument
-	}
-	else if (strcmp(temp, "ST") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		if (strcmp(temp, "GPS")) return CMD_ST_GPS;
-
-		return CMD_parseTime(temp, pArg);
-	}
-	else if (strcmp(temp, "SIM") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		if (strcmp(temp, "ENABLE")) return CMD_SIM_ENABLE;
-		if (strcmp(temp, "ACTIVATE")) return CMD_SIM_ACTIVATE;
-		if (strcmp(temp, "DISABLE")) return CMD_SIM_DISABLE;
-
-		return CMD_ERR_ARG;	// no such argument
-	}
-	else if (strcmp(temp, "SIMP") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		return CMD_parseSIMP(temp, pArg);
-	}
-	else if (strcmp(temp, "CAL") == 0){
-		return CMD_CAL;
-	}
-	else if (strcmp(temp, "BCN") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		if (strcmp(temp, "ON")) return CMD_BCN_ON;
-		if (strcmp(temp, "OFF")) return CMD_BCN_OFF;
-
-		return CMD_ERR_ARG;	// no such argument
-	}
-	else if (strcmp(temp, "DEP") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		if (strcmp(temp, "HS")) return CMD_DEP_HS;
-		if (strcmp(temp, "PC")) return CMD_DEP_PC;
-
-		return CMD_ERR_ARG;	// no such argument
-	}
-	else if (strcmp(temp, "REL") == 0){
-		temp = strtok(NULL, ",");
-		if (temp == 0) return CMD_ERR;
-
-		if (strcmp(temp, "HS")) return CMD_REL_HS;
-
-		return CMD_ERR_ARG;	// no such argument
-	}
-//	else if (strcmp(temp, "TEST") == 0){
-//		temp = strtok(NULL, ",");
-//		if (temp == 0) return CMD_ERR;
-//
-//		if (strcmp(temp, "")) return CMD_;
-//		if (strcmp(temp, "")) return CMD_;
-//		return CMD_ERR_ARG;	// no such argument
-//	}
-	else if (strcmp(temp, "INIT") == 0){
-		return CMD_INIT;
-	}
-	else if (strcmp(temp, "RESET") == 0){
-		return CMD_RESET;
-	}
-	else{
-		// no such command
-		return CMD_ERR_COM;
-	}
-}
-CMD_CommandCaseTypeDef CMD_parseTime(uint8_t *message, int *pArg){
-	// the function doesn't check NULL pointer error; check it before calling this function
-	int i = 0;
-	int field_num = 0;
-	uint8_t time_var[3] = {0,};
-	uint8_t ch;
-
-	// i: 				01234567
-	// message: 	hh:mm:ss
-
-	while(1){
-		ch = message[i];
-		if ('0' <= ch && ch <= '9' && i != 2 && i != 5 && i <= 7){
-			time_var[field_num] = time_var[field_num] * 10 + ch - '0';
-		}
-		else if (ch == ':' && ( i == 2 || i == 5 )){
-			field_num++;
-		}
-		else if (ch == '\0' && i == 8){
-			break;
-		}
-		else{
-			*pArg = 0;
-			return CMD_ERR_ARG;
-		}
-	}
-
-	// check value
-	if (time_var[0] > 24 || time_var[0] < 0){
-		*pArg = 0;
-		return CMD_ERR_ARG;
-	}
-	if (time_var[1] > 59 || time_var[1] < 0){
-		*pArg = 0;
-		return CMD_ERR_ARG;
-	}
-	if (time_var[2] > 59 || time_var[2] < 0){
-		*pArg = 0;
-		return CMD_ERR_ARG;
-	}
-
-	*pArg = time_var[0] * 10000 + time_var[1] * 100 + time_var[2];
-
-	return CMD_ST_TIME;
-}
-CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg){
+CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg) {
 	uint8_t ch;
 	int i = 0;
 	int simp = 0;
 
-	while(1){
+	while (1) {
 		ch = message[i];
-		if ('0' <= ch && ch <= '9'){
+		if ('0' <= ch && ch <= '9') {
 			simp = simp * 10 + ch - '0';
 			i++;
-		}
-		else if (ch == '\0'){
+		} else if (ch == '\0') {
 			break;
-		}
-		else{
+		} else {
 			*pArg = 0;
 			return CMD_ERR_ARG;
 		}
@@ -1239,162 +1052,157 @@ CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg){
 	*pArg = simp;
 	return CMD_SIMP;
 }
-void CMD_excuteCX_ON(void){
+
+void CMD_excuteCX_ON(void) {
+	logi("CMD_CX_ON");
+	isCommunication = IH_CX_ON;
+
+	/*
 	uint32_t bkpdata;
-  HAL_PWR_EnableBkUpAccess();
+	HAL_PWR_EnableBkUpAccess();
 	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
-	bkpdata |= ( 1U << 1 );
+	HAL_PWR_DisableBkUpAccess();
+	bkpdata |= (1U << 1);
+	HAL_PWR_EnableBkUpAccess();
 	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
-  HAL_PWR_DisableBkUpAccess();
-
-	// ToDo: implement execution code
-	logd("not implemented.\n");
-	return;
+	HAL_PWR_DisableBkUpAccess();
+	*/
 }
-void CMD_excuteCX_OFF(void){
+
+void CMD_excuteCX_OFF(void) {
+	logi("CMD_CX_OFF");
+	isCommunication = IH_CX_OFF;
+
+	/*
 	uint32_t bkpdata;
-  HAL_PWR_EnableBkUpAccess();
+	HAL_PWR_EnableBkUpAccess();
 	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
-	bkpdata &= ~( 1U << 1 );
+	bkpdata &= ~(1U << 1);
 	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
-  HAL_PWR_DisableBkUpAccess();
-
-	// ToDo: implement execution code
-	logd("not implemented.\n");
-	return;
+	HAL_PWR_DisableBkUpAccess();
+	*/
 }
-void CMD_excuteST_TIME(int argument){
-	RTC_TimeTypeDef sTime;
-	uint8_t hours, minutes, seconds;
 
-	seconds = argument % 100;
-	argument /= 100;
-	minutes = argument % 100;
-	argument /= 100;
-	hours = argument % 100;
-	argument /= 100;
+void CMD_excuteST_TIME(const uint8_t *argument) {
+	logi("CMD_SET_UTC_TIME");
+	RTC_TimeTypeDef time = { 0 };
+	uint8_t btemp[2];
+	uint8_t vtemp;
+	// hours
+	memcpy(btemp, argument, 2);
+	vtemp = atoi((char*) btemp);
+	if (vtemp > 24) return;
+	time.Hours = vtemp;
 
-	sTime.Hours = hours;
-	sTime.Minutes = minutes;
-	sTime.Seconds = seconds;
+	// minutes
+	memcpy(btemp, argument + 3, 2);
+	vtemp = atoi((char*) btemp);
+	if (vtemp > 60) return;
+	time.Minutes = vtemp;
 
-	HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-	logi("RTC set to %d:%d:%d\n", hours, minutes, seconds);
-	return;
+	// seconds
+	memcpy(btemp, argument + 6, 2);
+	vtemp = atoi((char*) btemp);
+	if (vtemp > 60) return;
+	time.Seconds = vtemp;
+
+	HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
 }
-void CMD_excuteST_GPS(void){
-	sTime.Hours = gps_data.hours;
-	sTime.Minutes = gps_data.minutes;
-	sTime.Seconds = gps_data.seconds;
-	logi("RTC set to %d:%d:%d\n", gps_data.hours, gps_data.minutes, gps_data.seconds);
-	return;
+void CMD_excuteST_GPS(void) {
+	logi("CMD_SET_GPS_TIME");
+	isTimeSetGPS = TRUE;
 }
-void CMD_excuteSIM_ENABLE(void){
+void CMD_excuteSIM_ENABLE(void) {
+	logi("CMD_SIM_ENABLE");
 	// ToDo: implement execution code
 	// if state is flight: deny
 	// if state is simulation: do nothing
 	// else: change state to SIM_ENABLED
-	logd("not implemented.\n");
-	return;
+	logd("not implemented.");
 }
-void CMD_excuteSIM_ACTIVATE(void){
+void CMD_excuteSIM_ACTIVATE(void) {
+	logi("CMD_SIM_ACTIVATE");
 	// ToDo: implement execution code
 	// if state is SIM_ENABLED: change it to S_LAUNCH_WAIT
 	// else: do nothing
-	logd("not implemented.\n");
-	return;
+	logd("not implemented.");
 }
-void CMD_excuteSIM_DISABLE(void){
+void CMD_excuteSIM_DISABLE(void) {
+	logi("CMD_SIM_DISABLE");
 	// ToDo: implement execution code
 	// if state is one of simulation mode: change it to VEHICLE_RESET
-	logd("not implemented.\n");
-	return;
+	logd("not implemented.");
 }
-void CMD_excuteSIMP(int argument){
+void CMD_excuteSIMP(int argument) {
 	// ToDo: implement execution code
 	// if this is the first simp data after sim_activate: set simulated zero altitude calibration
 	// else: change simulated pressure and change simulated altitude and raise simulated altitude update flag
-	logd("not implemented.\n");
-	return;
+	logd("not implemented.");
 }
-void CMD_excuteCAL(void){
-	int ret = Calibrate();
-	if ( ret ){
-		logi("error occured. perform 8-figure for IMU calibration.\n");
-	}
-	else{
-		logi("calibrated all sensors and saved the data.\n");
-	}
-	return;
-}
-void CMD_excuteBCN_ON(void){
-	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-	return;
-}
-void CMD_excuteBCN_OFF(void){
-	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
-	return;
-}
-void CMD_excuteDEP_HS(void){
-	int deg = Servo_Read(&hservo1);
-	//ToDo: implement state detection and state transfer
 
-	// not in flight mode nor in simulation mode
-	if (deg < 0){
-		Error_Handler();
+void CMD_excuteCAL(void) {
+	logi("CMD_CAL");
+	int ret = Calibrate();
+	if (ret) {
+		loge("Perform 8-figure for IMU calibration.");
+	} else {
+		logi("calibrated all sensors and saved the data.");
 	}
-	if (deg >= 90){
-		Servo_Write(&hservo1, 0);
-	}
-	else{
-		Servo_Write(&hservo1, 180);
-	}
-	return;
 }
-void CMD_excuteDEP_PC(void){
+
+void CMD_excuteBCN_ON(void) {
+	logi("CMD_BCN_ON");
+	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+}
+
+void CMD_excuteBCN_OFF(void) {
+	logi("CMD_BCN_OFF");
+	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
+}
+
+
+void CMD_excuteDEP_PC(void) {
+	logi("CMD_DEP_PC");
 	int deg = Servo_Read(&hservo2);
 	//ToDo: implement state detection and state transfer
 
 	// not in flight mode nor in simulation mode
-	if (deg < 0){
+	if (deg < 0) {
 		Error_Handler();
 	}
-	if (deg >= 90){
+	if (deg >= 90) {
 		Servo_Write(&hservo2, 0);
-	}
-	else{
+	} else {
 		Servo_Write(&hservo2, 180);
 	}
-	return;
 }
-void CMD_excuteREL_HS(void){
+void CMD_excuteREL_HS(void) {
+	logi("CMD_REL_HS");
 	int deg = Servo_Read(&hservo3);
 	//ToDo: implement state detection and state transfer
 
 	// not in flight mode nor in simulation mode
-	if (deg < 0){
+	if (deg < 0) {
 		Error_Handler();
 	}
-	if (deg >= 90){
+	if (deg >= 90) {
 		Servo_Write(&hservo3, 0);
-	}
-	else{
+	} else {
 		Servo_Write(&hservo3, 180);
 	}
-	return;
 }
-void CMD_excuteINIT(void){
+void CMD_excuteINIT(void) {
+	logi("CMD_INIT");
 	// ToDo: implement execution code
 	// if state is VEHICLE_RESET: change it to F_LAUNCH_WAIT
-	logd("not implemented.\n");
-	return;
 }
-void CMD_excuteRESET(void){
+void CMD_excuteRESET(void) {
+	logi("CMD_RESET");
 	// ToDo: implement state transfer to vehicle_reset state
-	Backup();
+	//Backup();
 	NVIC_SystemReset();
-	return;
 }
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_vMainTask */
@@ -1624,9 +1432,6 @@ void vReceiveTask(void *argument)
   		memset(RFdata, 0, sizeof(RFdata));
   		memcpy(RFdata, packet.data+5, packet.length-5);
   		RFParsing(RFdata, packet.length-5);
-
-//  		cb_init();
-  		logd("RFdata:%s", RFdata);
   	}
   	}
   }
@@ -1852,6 +1657,7 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.air_speed = air_speed;
   sensor_data_container.altitude_updated_flag = 1;
 
+  //logd("sensor");
   /* USER CODE END vSensorReadingCallback */
 }
 

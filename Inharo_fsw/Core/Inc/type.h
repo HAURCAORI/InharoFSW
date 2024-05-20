@@ -47,10 +47,12 @@
 #define RX_CMD_CX						0x5843			//'CX
 #define RX_CMD_ST						0x5453			//'ST'
 #define RX_CMD_CAL					0x4C4143		//'CAL'
-#define RX_CMD_SIM					0X4D4953		//'SIM'
-#define RX_CMD_BCN					0X4E4342		//'BCN'
-#define RX_CMD_REL					0X4C4552		//'REL'
-#define RX_CMD_DEP					0X504544		//'DEP'
+#define RX_CMD_SIM					0x4D4953		//'SIM'
+#define RX_CMD_BCN					0x4E4342		//'BCN'
+#define RX_CMD_REL					0x4C4552		//'REL'
+#define RX_CMD_DEP					0x504544		//'DEP'
+#define RX_CMD_RESET				0x534552		//'RES'
+#define RX_CMD_INIT					0x54494E49	//'INIT'
 
 
 #define IH_CX_OFF						0x00
