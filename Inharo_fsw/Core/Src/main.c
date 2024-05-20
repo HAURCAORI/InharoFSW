@@ -36,7 +36,7 @@ typedef struct{
 	// bmp390, scale: 100
 	float altitude;
 	float s_altitude;
-	int64_t temperature;
+	float temperature;
 	uint64_t pressure;
 	uint64_t s_pressure;
 	// bno055
@@ -179,6 +179,11 @@ const osEventFlagsAttr_t EventReceive_attributes = {
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
+// System Command Variable
+uint8_t isCommunication = IH_CX_OFF;
+uint8_t isTimeSetGPS = FALSE;
+
+//
 SensorDataContainerTypeDef sensor_data_container = {0, };
 VehicleStateTypeDef vehicle_state = VEHICLE_RESET;
 
@@ -283,7 +288,6 @@ int main(void)
   }
 
   cb_init(&cb_tle, TLE_Circular_Buffer_Size, sizeof(Telemetry));
-
   logi("Initialized");
   /* USER CODE END 2 */
 
@@ -846,7 +850,95 @@ void RFParsing(uint8_t* data, size_t length) {
 
 	if(teamID != RX_HEADER_TEAM_ID) { return; }
 	if(cmd == RX_HEADER_CMD) {
-		logd("data");
+		uint8_t command[8];
+		uint8_t argument[20];
+		uint8_t start = 8; // second comma position
+		memset(command,0,sizeof(command));
+		memset(argument,0,sizeof(argument));
+
+		//Parsing third field
+		for(int i = 9; i < length; i++) {
+			if(data[i] == ',') {
+				memcpy(command, data + start + 1, i - start - 1);
+				start = i;
+			}
+		}
+
+		//Parsing forth field
+		memcpy(argument, data + start + 1, length - start - 1);
+
+		uint64_t Icommand = 0;
+		RTC_TimeTypeDef time = {0};
+		uint8_t btemp[2];
+		uint8_t vtemp;
+
+		memcpy(&Icommand, command,8);
+		switch(Icommand) {
+		case RX_CMD_CX: {
+			if(WeakCharCompare(argument, "ON")) {
+				logi("CMD_CX_ON");
+				isCommunication = IH_CX_ON;
+			} else {
+				logi("CMD_CX_OFF");
+				isCommunication = IH_CX_OFF;
+			}
+			break;
+		}
+		case RX_CMD_ST: {
+			if(WeakCharCompare(argument, "GPS")) {
+				logi("CMD_SET_GPS_TIME");
+				isTimeSetGPS = TRUE;
+			} else {
+				logi("CMD_SET_UTC_TIME");
+				// hours
+				memcpy(btemp, argument, 2);
+				vtemp = (uint8_t)atoi(btemp);
+				if (vtemp > 24) break;
+				time.Hours = vtemp;
+
+				// minutes
+				memcpy(btemp, argument + 3, 2);
+				vtemp = (uint8_t) atoi(btemp);
+				if (vtemp > 60) break;
+				time.Minutes = vtemp;
+
+				// seconds
+				memcpy(btemp, argument + 6, 2);
+				vtemp = (uint8_t) atoi(btemp);
+				if (vtemp > 60) break;
+				time.Seconds = vtemp;
+
+				HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
+			}
+			break;
+		}
+		case RX_CMD_CAL: {
+			logi("CMD_CAL");
+			Calibrate();
+			break;
+		}
+		case RX_CMD_SIM: {
+			if(WeakCharCompare(argument, "ENABLE")) {
+				logi("CMD_SIM_ENABLE");
+			}
+			break;
+		}
+		case RX_CMD_BCN: {
+
+			break;
+		}
+		case RX_CMD_REL: {
+
+			break;
+		}
+		case RX_CMD_DEP: {
+
+			break;
+		}
+		default:
+			break;
+		}
+
 	} else if (cmd == RX_HEADER_ACK) {
 		ack_packet = data[9] << 8;
 		ack_packet |= data[10];
@@ -901,6 +993,7 @@ void vGPSTask(void *argument)
 	GPS_Packet packet;
 
 	uint32_t sentence;
+	RTC_TimeTypeDef time = {0};
 
 	HAL_UART_Receive_DMA(&huart1, uart1_rx_buffer, sizeof(uart1_rx_buffer));
   for(;;)
@@ -923,6 +1016,13 @@ void vGPSTask(void *argument)
 		switch(sentence) {
 		case GPS_SENTENCE_GGA: {
 			GPS_NMEA_parseGGA(packet.data, &gps_data);
+			if(isTimeSetGPS) {
+				time.Hours = gps_data.hours;
+				time.Minutes = gps_data.minutes;
+				time.Seconds = gps_data.seconds;
+				HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
+				isTimeSetGPS = FALSE;
+			}
 		}
 		}
 	}
@@ -1163,10 +1263,7 @@ void vTransmitLoopTask(void *argument)
   	if(flags & osFlagsError) { continue; }
   	if(!(flags & EVENT_RECEIVE_PUSH)) { continue; }
 
-  	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 0) != osOK) { continue; }
-
   	if(cb_value(&cb_tle, &tle) != cb_ok) {
-  		osSemaphoreRelease(TransmitSemaphoreHandle);
   		continue;
   	}
 
@@ -1190,7 +1287,6 @@ void vTransmitLoopTask(void *argument)
   		}
   	}
 
-  	osSemaphoreRelease(TransmitSemaphoreHandle);
 
   }
   /* USER CODE END vTransmitLoopTask */
@@ -1283,7 +1379,7 @@ void vSensorReadingCallback(void *argument)
 	// move data to sensor data container
   // ToDo: block other task and move data
   sensor_data_container.pressure = pressure;
-  sensor_data_container.temperature = temperature;
+  sensor_data_container.temperature = temperature / 100.0f;
   sensor_data_container.acc_x = acc_x;
   sensor_data_container.acc_y = acc_y;
   sensor_data_container.acc_z = acc_z;
@@ -1304,6 +1400,7 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
   sensor_data_container.altitude_updated_flag = 1;
+
   /* USER CODE END vSensorReadingCallback */
 }
 
@@ -1311,6 +1408,7 @@ void vSensorReadingCallback(void *argument)
 void vTransmitCallback(void *argument)
 {
   /* USER CODE BEGIN vTransmitCallback */
+	if(isCommunication != IH_CX_ON) { return; }
 
 	// Making Telemetry
 	UpdateTime();
@@ -1345,7 +1443,7 @@ void vTransmitCallback(void *argument)
 	cb_push(&cb_tle, &telemetry);
 	osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_PUSH);
 
-	logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
+	//logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
   /* USER CODE END vTransmitCallback */
 }
 

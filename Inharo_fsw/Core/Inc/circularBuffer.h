@@ -6,7 +6,7 @@
 #include <string.h>
 
 #define TLE_Circular_Buffer circular_buffer
-#define TLE_Circular_Buffer_Size 5
+#define TLE_Circular_Buffer_Size 30
 
 #define cbResult 		uint8_t
 #define cb_ok 			1<<0

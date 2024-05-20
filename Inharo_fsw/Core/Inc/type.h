@@ -39,13 +39,22 @@
 #define FRAME_ADDRESS_HIGH 	0xCC
 #define FRAME_ADDRESS_LOW 	0xCC
 
-#define GPS_SENTENCE_GGA 0x474741
+#define GPS_SENTENCE_GGA 		0x474741
 
 #define RX_HEADER_CMD				0x444D43   	//'CMD'
 #define RX_HEADER_ACK				0x4B4341   	//'ACK'
-#define RX_HEADER_TEAM_ID 	0x36333032	//2036
+#define RX_HEADER_TEAM_ID 	0x36333032	//'2036'
+#define RX_CMD_CX						0x5843			//'CX
+#define RX_CMD_ST						0x5453			//'ST'
+#define RX_CMD_CAL					0x4C4143		//'CAL'
+#define RX_CMD_SIM					0X4D4953		//'SIM'
+#define RX_CMD_BCN					0X4E4342		//'BCN'
+#define RX_CMD_REL					0X4C4552		//'REL'
+#define RX_CMD_DEP					0X504544		//'DEP'
 
 
+#define IH_CX_OFF						0x00
+#define IH_CX_ON						0xFF
 
 #define IH_UART1_MAX_LENGTH (80)
 #define IH_UART1_HEADER ('$')
@@ -109,7 +118,7 @@ typedef struct Telemetry {
 	float air_speed;
 	uint8_t heat_shield;
 	uint8_t parachute;
-	uint32_t temperature;
+	float temperature;
 	float voltage;
 	uint32_t pressure;
 	uint8_t GPS_time_hours;
@@ -124,6 +133,7 @@ typedef struct Telemetry {
 	float rot_z;
 	uint16_t cmd_echo;
 } Telemetry;
+
 #pragma pack(pop)
 
 #endif /* INC_TYPE_H_ */
