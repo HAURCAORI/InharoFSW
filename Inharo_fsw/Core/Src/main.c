@@ -600,16 +600,16 @@ static void _Servo_Init(void){
 int Calibrate(void){
 	bno055_calibration_data_t bno055_cal_data;
 
-	int32_t cal_zero_altitude0 = 0;
-	int32_t cal_zero_altitude1 = 0;
-	int32_t	cal_zero_velocity0 = 0;
-	int32_t	cal_zero_velocity1 = 0;
-	int32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
-	int32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
-	int32_t	cal_mag_ofst_y_mag_ofst_z = 0;
-	int32_t	cal_acc_ofst_x_acc_ofst_y = 0;
-	int32_t	cal_acc_ofst_z_reserved = 0;
-	int32_t	cal_imu_radius_mag_acc = 0;
+	uint32_t cal_zero_altitude0 = 0;
+	uint32_t cal_zero_altitude1 = 0;
+	uint32_t	cal_zero_velocity0 = 0;
+	uint32_t	cal_zero_velocity1 = 0;
+	uint32_t	cal_gyro_ofst_x_gyro_ofst_y = 0;
+	uint32_t	cal_gyro_ofst_z_mag_ofst_x = 0;
+	uint32_t	cal_mag_ofst_y_mag_ofst_z = 0;
+	uint32_t	cal_acc_ofst_x_acc_ofst_y = 0;
+	uint32_t	cal_acc_ofst_z_reserved = 0;
+	uint32_t	cal_rad_mag_rad_acc = 0;
 
 	// get bno055 calibration data
 	//if(bno055_getCalibrationState().sys < 0x03) return 1; // 주석  ??   ?
@@ -626,23 +626,50 @@ int Calibrate(void){
 	// make calibration data for RTC backup register
 	union{
 		double  val_double;
-		int32_t val_int32[2];
-	}double_and_int32;
+		uint32_t val_uint32[2];
+	}double_to_uint32;
 
-	double_and_int32.val_double = r_pressure_sea_level;
-	cal_zero_altitude0 = double_and_int32.val_int32[0];
-	cal_zero_altitude1 = double_and_int32.val_int32[1];
+	union{
+		int16_t val_int16[2];
+		uint32_t val_uint32;
+	}int16_to_uint32;
 
-	double_and_int32.val_double = DP_getCalibration();
-	cal_zero_velocity0 = double_and_int32.val_int32[0];
-	cal_zero_velocity1 = double_and_int32.val_int32[1];
+	union{
+		uint16_t val_uint16[2];
+		uint32_t val_uint32;
+	}uint16_to_uint32;
 
-	cal_gyro_ofst_x_gyro_ofst_y = (bno055_cal_data.offset.gyro.x 	<< 16)|(bno055_cal_data.offset.gyro.y);
-	cal_gyro_ofst_z_mag_ofst_x  = (bno055_cal_data.offset.gyro.z 	<< 16)|(bno055_cal_data.offset.mag.x);
-	cal_mag_ofst_y_mag_ofst_z   = (bno055_cal_data.offset.mag.y  	<< 16)|(bno055_cal_data.offset.mag.z);
-	cal_acc_ofst_x_acc_ofst_y		= (bno055_cal_data.offset.accel.x	<< 16)|(bno055_cal_data.offset.accel.y);
-	cal_acc_ofst_z_reserved			= (bno055_cal_data.offset.accel.z	<< 16);
-	cal_imu_radius_mag_acc			= (bno055_cal_data.radius.mag			<< 16)|(bno055_cal_data.radius.accel);
+	double_to_uint32.val_double 		= r_pressure_sea_level;
+	cal_zero_altitude0 							= double_to_uint32.val_uint32[0];
+	cal_zero_altitude1 							= double_to_uint32.val_uint32[1];
+
+	double_to_uint32.val_double 		= DP_getCalibration();
+	cal_zero_velocity0 							= double_to_uint32.val_uint32[0];
+	cal_zero_velocity1 							= double_to_uint32.val_uint32[1];
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.gyro.y;
+	cal_gyro_ofst_x_gyro_ofst_y 		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.gyro.z;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.x;
+	cal_gyro_ofst_z_mag_ofst_x  		=	int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.mag.y;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.mag.z;
+	cal_mag_ofst_y_mag_ofst_z   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.x;
+	int16_to_uint32.val_int16[1] 		= bno055_cal_data.offset.accel.y;
+	cal_acc_ofst_x_acc_ofst_y   		= int16_to_uint32.val_uint32;
+
+	int16_to_uint32.val_int16[0] 		= bno055_cal_data.offset.accel.z;
+	int16_to_uint32.val_int16[1] 		= 0;
+	cal_acc_ofst_z_reserved     		= int16_to_uint32.val_uint32;
+
+	uint16_to_uint32.val_uint16[0] 	= bno055_cal_data.radius.mag;
+	uint16_to_uint32.val_uint16[1] 	= bno055_cal_data.radius.accel;
+	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
 
 	// save calibration data
   HAL_PWR_EnableBkUpAccess();
@@ -655,7 +682,7 @@ int Calibrate(void){
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, 	cal_mag_ofst_y_mag_ofst_z);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
-  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_imu_radius_mag_acc);
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
   HAL_PWR_DisableBkUpAccess();
 
 	return 0;
@@ -759,7 +786,7 @@ void Backup(void){
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
   HAL_PWR_DisableBkUpAccess();
 
-	return 0;
+	return;
 
 }
 void BackupRecovery(void){
@@ -780,7 +807,6 @@ void BackupRecovery(void){
 	uint32_t	cal_rad_mag_rad_acc;
 
 	// load calibration data / backup data
-	HAL_PWR_EnableBkUpAccess();
 	bkp_vehicle 								= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
 	bkp_packet_count 						= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1);
 	cal_zero_altitude0 					= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
@@ -795,7 +821,6 @@ void BackupRecovery(void){
 	cal_acc_ofst_x_acc_ofst_y 	= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR11);
 	cal_acc_ofst_z_reserved 		= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR12);
 	cal_rad_mag_rad_acc 				= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR13);
-	HAL_PWR_DisableBkUpAccess();
 
 	union{
 		uint32_t	val_uint32;
@@ -1057,30 +1082,28 @@ void CMD_excuteCX_ON(void) {
 	logi("CMD_CX_ON");
 	isCommunication = IH_CX_ON;
 
-	/*
+
 	uint32_t bkpdata;
-	HAL_PWR_EnableBkUpAccess();
 	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
-	HAL_PWR_DisableBkUpAccess();
 	bkpdata |= (1U << 1);
 	HAL_PWR_EnableBkUpAccess();
 	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
 	HAL_PWR_DisableBkUpAccess();
-	*/
+
 }
 
 void CMD_excuteCX_OFF(void) {
 	logi("CMD_CX_OFF");
 	isCommunication = IH_CX_OFF;
 
-	/*
+
 	uint32_t bkpdata;
-	HAL_PWR_EnableBkUpAccess();
 	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
 	bkpdata &= ~(1U << 1);
+	HAL_PWR_EnableBkUpAccess();
 	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
 	HAL_PWR_DisableBkUpAccess();
-	*/
+
 }
 
 void CMD_excuteST_TIME(const uint8_t *argument) {
