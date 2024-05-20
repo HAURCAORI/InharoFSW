@@ -79,6 +79,40 @@ typedef enum{
 	S_PC_DEPLOYED = 	0x14,
 	S_LANDED = 				0x15
 }VehicleStateTypeDef;
+
+typedef enum{
+	CMD_ERR,
+	CMD_ERR_ARG,
+	CMD_ERR_COM,
+
+	CMD_CX_ON,
+	CMD_CX_OFF,
+
+	CMD_ST_TIME,
+	CMD_ST_GPS,
+
+	CMD_SIM_ENABLE,
+	CMD_SIM_ACTIVATE,
+	CMD_SIM_DISABLE,
+
+	CMD_SIMP,
+
+	CMD_CAL,
+
+	CMD_BCN_ON,
+	CMD_BCN_OFF,
+
+	CMD_DEP_HS,
+	CMD_DEP_PC,
+
+	CMD_REL_HS,
+
+	CMD_TEST,
+
+	CMD_INIT,
+
+	CMD_RESET
+}CMD_CommandCaseTypeDef;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -176,6 +210,7 @@ const osEventFlagsAttr_t EventReceive_attributes = {
   .name = "EventReceive"
 };
 /* USER CODE BEGIN PV */
+
 Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
@@ -228,8 +263,28 @@ static void _BNO055_Init(void);
 static void _SD_Init(void);
 static void _Servo_Init(void);
 int Calibrate(void);
-int Backup(void);
+void Backup(void);
 void BackupRecovery(void);
+CMD_CommandCaseTypeDef CMD_parseCommandMessage(uint8_t *message, int *pArg);
+CMD_CommandCaseTypeDef CMD_parseTime(uint8_t *message, int *pArg);
+CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg);
+void CMD_excuteCX_ON(void);
+void CMD_excuteCX_OFF(void);
+void CMD_excuteST_TIME(int argument);
+void CMD_excuteST_GPS(void);
+void CMD_excuteSIM_ENABLE(void);
+void CMD_excuteSIM_ACTIVATE(void);
+void CMD_excuteSIM_DISABLE(void);
+void CMD_excuteSIMP(int argument);
+void CMD_excuteCAL(void);
+void CMD_excuteBCN_ON(void);
+void CMD_excuteBCN_OFF(void);
+void CMD_excuteDEP_HS(void);
+void CMD_excuteDEP_PC(void);
+void CMD_excuteREL_HS(void);
+void CMD_excuteINIT(void);
+void CMD_excuteRESET(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -608,7 +663,7 @@ int Calibrate(void){
 
 	return 0;
 }
-int Backup(void){
+void Backup(void){
 	bno055_calibration_data_t bno055_cal_data;
 	uint32_t	bkp_vehicle =0;
 	uint32_t	bkp_packet_count = 0;
@@ -808,6 +863,80 @@ void BackupRecovery(void){
 
 	return;
 }
+void CMD_commandHandler(uint8_t *message){
+	int argument;
+	CMD_CommandCaseTypeDef ret;
+
+	ret = CMD_parseCommandMessage(message, &argument);
+	switch(ret){
+	case CMD_ERR:
+		loge("unknown command parser error, possibly a null pointer error. \n");
+		break;
+	case CMD_ERR_ARG:
+		loge("wrong command argument error.\n");
+		break;
+	case CMD_ERR_COM:
+		loge("wrong command error.\n");
+		break;
+	case CMD_CX_ON:
+		CMD_excuteCX_ON();
+		break;
+	case CMD_CX_OFF:
+		CMD_excuteCX_OFF();
+		break;
+	case CMD_ST_TIME:
+		CMD_excuteST_TIME(argument);
+		break;
+	case CMD_ST_GPS:
+		CMD_excuteST_GPS();
+		break;
+	case CMD_SIM_ENABLE:
+		CMD_excuteSIM_ENABLE();
+		break;
+	case CMD_SIM_ACTIVATE:
+		CMD_excuteSIM_ACTIVATE();
+		break;
+	case CMD_SIM_DISABLE:
+		CMD_excuteSIM_DISABLE();
+		break;
+	case CMD_SIMP:
+		CMD_excuteSIMP(argument);
+		break;
+	case CMD_CAL:
+		CMD_excuteCAL();
+		break;
+	case CMD_BCN_ON:
+		CMD_excuteBCN_ON();
+		break;
+	case CMD_BCN_OFF:
+		CMD_excuteBCN_OFF();
+		break;
+	case CMD_DEP_HS:
+		CMD_excuteDEP_HS();
+		break;
+	case CMD_DEP_PC:
+		CMD_excuteDEP_PC();
+		break;
+	case CMD_REL_HS:
+		CMD_excuteREL_HS();
+		break;
+	case CMD_TEST:
+		logd("CMD_TEST not implemented yet.\n");
+		break;
+	case CMD_INIT:
+		CMD_excuteINIT();
+		break;
+	case CMD_RESET:
+		CMD_excuteRESET();
+		break;
+	default:
+		// never occurs
+		Error_Handler();
+		break;
+	}
+}
+CMD_CommandCaseTypeDef CMD_parseCommandMessage(uint8_t *message, int *pArg){
+	uint8_t *temp;
 
 
 void SendTelemetry(Telemetry* tle) {
@@ -944,6 +1073,327 @@ void RFParsing(uint8_t* data, size_t length) {
 		ack_packet |= data[10];
 		osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_ACK);
 	}
+}
+	if (message == NULL || pArg == NULL){
+		return CMD_ERR;
+	}
+	if (strncmp(message, "CMD,2036,", 9) != 0){
+		// invalid command
+		return CMD_ERR;
+	}
+	// the message contains "CMD,2036," phrase, so it is ok to strtok() twice
+	temp = strtok(message, ",");
+	temp = strtok(NULL, ",");
+
+	// from now on, temp may point to NULL
+	temp = strtok(NULL, ",");
+	if (temp == 0){
+		return CMD_ERR;
+	}
+
+	else if (strcmp(temp, "CX") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;	// invalid command
+
+		if (strcmp(temp, "ON")) return CMD_CX_ON;
+		if (strcmp(temp, "OFF")) return CMD_CX_OFF;
+
+		return CMD_ERR_ARG;	// no such argument
+	}
+	else if (strcmp(temp, "ST") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		if (strcmp(temp, "GPS")) return CMD_ST_GPS;
+
+		return CMD_parseTime(temp, pArg);
+	}
+	else if (strcmp(temp, "SIM") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		if (strcmp(temp, "ENABLE")) return CMD_SIM_ENABLE;
+		if (strcmp(temp, "ACTIVATE")) return CMD_SIM_ACTIVATE;
+		if (strcmp(temp, "DISABLE")) return CMD_SIM_DISABLE;
+
+		return CMD_ERR_ARG;	// no such argument
+	}
+	else if (strcmp(temp, "SIMP") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		return CMD_parseSIMP(temp, pArg);
+	}
+	else if (strcmp(temp, "CAL") == 0){
+		return CMD_CAL;
+	}
+	else if (strcmp(temp, "BCN") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		if (strcmp(temp, "ON")) return CMD_BCN_ON;
+		if (strcmp(temp, "OFF")) return CMD_BCN_OFF;
+
+		return CMD_ERR_ARG;	// no such argument
+	}
+	else if (strcmp(temp, "DEP") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		if (strcmp(temp, "HS")) return CMD_DEP_HS;
+		if (strcmp(temp, "PC")) return CMD_DEP_PC;
+
+		return CMD_ERR_ARG;	// no such argument
+	}
+	else if (strcmp(temp, "REL") == 0){
+		temp = strtok(NULL, ",");
+		if (temp == 0) return CMD_ERR;
+
+		if (strcmp(temp, "HS")) return CMD_REL_HS;
+
+		return CMD_ERR_ARG;	// no such argument
+	}
+//	else if (strcmp(temp, "TEST") == 0){
+//		temp = strtok(NULL, ",");
+//		if (temp == 0) return CMD_ERR;
+//
+//		if (strcmp(temp, "")) return CMD_;
+//		if (strcmp(temp, "")) return CMD_;
+//		return CMD_ERR_ARG;	// no such argument
+//	}
+	else if (strcmp(temp, "INIT") == 0){
+		return CMD_INIT;
+	}
+	else if (strcmp(temp, "RESET") == 0){
+		return CMD_RESET;
+	}
+	else{
+		// no such command
+		return CMD_ERR_COM;
+	}
+}
+CMD_CommandCaseTypeDef CMD_parseTime(uint8_t *message, int *pArg){
+	// the function doesn't check NULL pointer error; check it before calling this function
+	int i = 0;
+	int field_num = 0;
+	uint8_t time_var[3] = {0,};
+	uint8_t ch;
+
+	// i: 				01234567
+	// message: 	hh:mm:ss
+
+	while(1){
+		ch = message[i];
+		if ('0' <= ch && ch <= '9' && i != 2 && i != 5 && i <= 7){
+			time_var[field_num] = time_var[field_num] * 10 + ch - '0';
+		}
+		else if (ch == ':' && ( i == 2 || i == 5 )){
+			field_num++;
+		}
+		else if (ch == '\0' && i == 8){
+			break;
+		}
+		else{
+			*pArg = 0;
+			return CMD_ERR_ARG;
+		}
+	}
+
+	// check value
+	if (time_var[0] > 24 || time_var[0] < 0){
+		*pArg = 0;
+		return CMD_ERR_ARG;
+	}
+	if (time_var[1] > 59 || time_var[1] < 0){
+		*pArg = 0;
+		return CMD_ERR_ARG;
+	}
+	if (time_var[2] > 59 || time_var[2] < 0){
+		*pArg = 0;
+		return CMD_ERR_ARG;
+	}
+
+	*pArg = time_var[0] * 10000 + time_var[1] * 100 + time_var[2];
+
+	return CMD_ST_TIME;
+}
+CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg){
+	uint8_t ch;
+	int i = 0;
+	int simp = 0;
+
+	while(1){
+		ch = message[i];
+		if ('0' <= ch && ch <= '9'){
+			simp = simp * 10 + ch - '0';
+			i++;
+		}
+		else if (ch == '\0'){
+			break;
+		}
+		else{
+			*pArg = 0;
+			return CMD_ERR_ARG;
+		}
+	}
+	*pArg = simp;
+	return CMD_SIMP;
+}
+void CMD_excuteCX_ON(void){
+	uint32_t bkpdata;
+  HAL_PWR_EnableBkUpAccess();
+	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
+	bkpdata |= ( 1U << 1 );
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
+  HAL_PWR_DisableBkUpAccess();
+
+	// ToDo: implement execution code
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteCX_OFF(void){
+	uint32_t bkpdata;
+  HAL_PWR_EnableBkUpAccess();
+	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
+	bkpdata &= ~( 1U << 1 );
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
+  HAL_PWR_DisableBkUpAccess();
+
+	// ToDo: implement execution code
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteST_TIME(int argument){
+	RTC_TimeTypeDef sTime;
+	uint8_t hours, minutes, seconds;
+
+	seconds = argument % 100;
+	argument /= 100;
+	minutes = argument % 100;
+	argument /= 100;
+	hours = argument % 100;
+	argument /= 100;
+
+	sTime.Hours = hours;
+	sTime.Minutes = minutes;
+	sTime.Seconds = seconds;
+
+	HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	logi("RTC set to %d:%d:%d\n", hours, minutes, seconds);
+	return;
+}
+void CMD_excuteST_GPS(void){
+	sTime.Hours = gps_data.hours;
+	sTime.Minutes = gps_data.minutes;
+	sTime.Seconds = gps_data.seconds;
+	logi("RTC set to %d:%d:%d\n", gps_data.hours, gps_data.minutes, gps_data.seconds);
+	return;
+}
+void CMD_excuteSIM_ENABLE(void){
+	// ToDo: implement execution code
+	// if state is flight: deny
+	// if state is simulation: do nothing
+	// else: change state to SIM_ENABLED
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteSIM_ACTIVATE(void){
+	// ToDo: implement execution code
+	// if state is SIM_ENABLED: change it to S_LAUNCH_WAIT
+	// else: do nothing
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteSIM_DISABLE(void){
+	// ToDo: implement execution code
+	// if state is one of simulation mode: change it to VEHICLE_RESET
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteSIMP(int argument){
+	// ToDo: implement execution code
+	// if this is the first simp data after sim_activate: set simulated zero altitude calibration
+	// else: change simulated pressure and change simulated altitude and raise simulated altitude update flag
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteCAL(void){
+	int ret = Calibrate();
+	if ( ret ){
+		logi("error occured. perform 8-figure for IMU calibration.\n");
+	}
+	else{
+		logi("calibrated all sensors and saved the data.\n");
+	}
+	return;
+}
+void CMD_excuteBCN_ON(void){
+	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+	return;
+}
+void CMD_excuteBCN_OFF(void){
+	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
+	return;
+}
+void CMD_excuteDEP_HS(void){
+	int deg = Servo_Read(&hservo1);
+	//ToDo: implement state detection and state transfer
+
+	// not in flight mode nor in simulation mode
+	if (deg < 0){
+		Error_Handler();
+	}
+	if (deg >= 90){
+		Servo_Write(&hservo1, 0);
+	}
+	else{
+		Servo_Write(&hservo1, 180);
+	}
+	return;
+}
+void CMD_excuteDEP_PC(void){
+	int deg = Servo_Read(&hservo2);
+	//ToDo: implement state detection and state transfer
+
+	// not in flight mode nor in simulation mode
+	if (deg < 0){
+		Error_Handler();
+	}
+	if (deg >= 90){
+		Servo_Write(&hservo2, 0);
+	}
+	else{
+		Servo_Write(&hservo2, 180);
+	}
+	return;
+}
+void CMD_excuteREL_HS(void){
+	int deg = Servo_Read(&hservo3);
+	//ToDo: implement state detection and state transfer
+
+	// not in flight mode nor in simulation mode
+	if (deg < 0){
+		Error_Handler();
+	}
+	if (deg >= 90){
+		Servo_Write(&hservo3, 0);
+	}
+	else{
+		Servo_Write(&hservo3, 180);
+	}
+	return;
+}
+void CMD_excuteINIT(void){
+	// ToDo: implement execution code
+	// if state is VEHICLE_RESET: change it to F_LAUNCH_WAIT
+	logd("not implemented.\n");
+	return;
+}
+void CMD_excuteRESET(void){
+	// ToDo: implement state transfer to vehicle_reset state
+	Backup();
+	NVIC_SystemReset();
+	return;
 }
 /* USER CODE END 4 */
 
@@ -1174,6 +1624,9 @@ void vReceiveTask(void *argument)
   		memset(RFdata, 0, sizeof(RFdata));
   		memcpy(RFdata, packet.data+5, packet.length-5);
   		RFParsing(RFdata, packet.length-5);
+
+//  		cb_init();
+  		logd("RFdata:%s", RFdata);
   	}
   	}
   }
@@ -1357,9 +1810,8 @@ void vSensorReadingCallback(void *argument)
   	 * p1: pressure, sea level
   	 * T1: temperature, sea level
   	 */
-  //ToDo: get sea level pressure (calibrated)from RTC backup register
+
   double pressure_ratio = pressure * r_pressure_sea_level;
-//  double pressure_ratio = pressure * 9.869232667160128e-4;
   altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
 
   // calculate tilt angle
@@ -1377,7 +1829,6 @@ void vSensorReadingCallback(void *argument)
   air_speed /= 100;
 
 	// move data to sensor data container
-  // ToDo: block other task and move data
   sensor_data_container.pressure = pressure;
   sensor_data_container.temperature = temperature / 100.0f;
   sensor_data_container.acc_x = acc_x;
