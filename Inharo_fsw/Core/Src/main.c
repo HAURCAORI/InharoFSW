@@ -200,7 +200,7 @@ Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
 // System Command Variable
-uint8_t isCommunication	 		= IH_CX_ON;
+uint8_t isCommunication	 		= IH_CX_OFF;
 uint8_t isTimeSetGPS 		 		= FALSE;
 uint8_t isSimulationMode 		= FALSE;
 uint8_t isSimulationEnable 	= FALSE;
@@ -615,6 +615,8 @@ int Calibrate(void){
 	// calibrate velocity calculation
 	DP_calcCalibrationFromADC(sensor_data_container.adc_1);
 
+	return 0;
+
 	// make calibration data for RTC backup register
 	union{
 		double  val_double;
@@ -664,7 +666,7 @@ int Calibrate(void){
 	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
 
 	// save calibration data
-  HAL_PWR_EnableBkUpAccess();
+  //HAL_PWR_EnableBkUpAccess();
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
@@ -675,7 +677,7 @@ int Calibrate(void){
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
-  HAL_PWR_DisableBkUpAccess();
+  //HAL_PWR_DisableBkUpAccess();
 
 	return 0;
 }
@@ -1731,7 +1733,7 @@ void vTransmitCallback(void *argument)
 	telemetry.GPS_sats = gps_data.satellites;
 	telemetry.tilt_x = sensor_data_container.tilt_x *180/PI; // Axis Change
 	telemetry.tilt_y = sensor_data_container.tilt_y *180/PI;
-	telemetry.rot_z = sensor_data_container.rot_z   *180/PI;
+	telemetry.rot_z = sensor_data_container.rot_z;
 	telemetry.cmd_echo = cmd_echo;
 
 	// Push Telemetry
