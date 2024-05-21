@@ -64,21 +64,6 @@ typedef struct{
 	int altitude_updated_flag;
 }SensorDataContainerTypeDef;
 
-typedef enum{
-	VEHICLE_RESET = 	0x00,
-	F_LAUNCH_WAIT = 	0x01,
-	F_ASCENT = 				0x02,
-	F_HS_DEPLOYED = 	0x03,
-	F_PC_DEPLOYED = 	0x04,
-	F_LANDED = 				0x05,
-
-	SIM_ENABLED = 		0x10,
-	S_LAUNCH_WAIT = 	0x11,
-	S_ASCENT = 				0x12,
-	S_HS_DEPLOYED = 	0x13,
-	S_PC_DEPLOYED = 	0x14,
-	S_LANDED = 				0x15
-}VehicleStateTypeDef;
 
 typedef enum{
 	CMD_ERR,
@@ -122,11 +107,11 @@ typedef enum{
 double r_pressure_sea_level = 1.0 / ( 101325.0 * 100.0 );
 
 
-// scale 100
-#define VEHICLE_ASCENT_THRESHOLD 	500
-#define VEHICLE_HS_THRESHOLD 			500
-#define VEHICLE_PC_THRESHOLD 			10000
-#define VEHICLE_LAND_THRESHOLD 		100
+// scale 1
+#define VEHICLE_ASCENT_THRESHOLD 	5
+#define VEHICLE_HS_THRESHOLD 			5
+#define VEHICLE_PC_THRESHOLD 			100
+#define VEHICLE_LAND_THRESHOLD 		1
 
 /* USER CODE END PD */
 
@@ -215,12 +200,17 @@ Servo_HandleTypeDef hservo1, hservo2, hservo3;
 USB_Buffer_Type usb_rx_buffer;
 
 // System Command Variable
-uint8_t isCommunication = IH_CX_ON;
-uint8_t isTimeSetGPS = FALSE;
+uint8_t isCommunication	 		= IH_CX_ON;
+uint8_t isTimeSetGPS 		 		= FALSE;
+uint8_t isSimulationMode 		= FALSE;
+uint8_t isSimulationEnable 	= FALSE;
 
 //
 SensorDataContainerTypeDef sensor_data_container = {0, };
 VehicleStateTypeDef vehicle_state = VEHICLE_RESET;
+CommandEcho cmd_echo = 0;
+uint8_t isHSDeployed = FALSE;
+uint8_t isPCDeployed = FALSE;
 
 uint8_t IH_UART1_headerPass = 0;
 uint8_t IH_UART1_pMessage = 0;
@@ -282,6 +272,7 @@ void CMD_excuteREL_HS(void);
 void CMD_excuteINIT(void);
 void CMD_excuteRESET(void);
 
+uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -492,6 +483,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   	osSemaphoreRelease(ReceiveSemaphoreHandle);
   }
   else if(huart->Instance == USART1) {
+  	CDC_Transmit_FS(uart1_rx_buffer, 1);
 		// Buffer Timeout
 		if (HAL_GetTick() - receive_tick > 100) {
 			gps_rx_buffer.isReceiving = FALSE;
@@ -936,9 +928,11 @@ void RFParsing(uint8_t *data, size_t length) {
 		switch (Icommand) {
 		case RX_CMD_CX: {
 			if (WeakCharCompare(argument, "ON")) {
+				cmd_echo = ECHO_CX_ON;
 				isCommunication = IH_CX_ON;
 				//CMD_excuteCX_ON();
 			} else {
+				cmd_echo = ECHO_CX_OFF;
 				isCommunication = IH_CX_OFF;
 				//CMD_excuteCX_OFF();
 			}
@@ -947,58 +941,75 @@ void RFParsing(uint8_t *data, size_t length) {
 
 		case RX_CMD_ST: {
 			if (WeakCharCompare(argument, "GPS")) {
-				//CMD_excuteST_GPS();
+				cmd_echo = ECHO_ST_GPS;
 				isTimeSetGPS = TRUE;
+				//CMD_excuteST_GPS();
 			} else {
+				cmd_echo = ECHO_ST_UTC;
 				//CMD_excuteST_TIME(argument);
 
-					// hours
-					memcpy(btemp, argument, 2);
-					vtemp = atoi((char*) btemp);
-					if (vtemp > 24) return;
-					time.Hours = vtemp;
+				// hours
+				memcpy(btemp, argument, 2);
+				vtemp = atoi((char*) btemp);
+				if (vtemp > 24)
+					return;
+				time.Hours = vtemp;
 
-					// minutes
-					memcpy(btemp, argument + 3, 2);
-					vtemp = atoi((char*) btemp);
-					if (vtemp > 60) return;
-					time.Minutes = vtemp;
+				// minutes
+				memcpy(btemp, argument + 3, 2);
+				vtemp = atoi((char*) btemp);
+				if (vtemp > 60)
+					return;
+				time.Minutes = vtemp;
 
-					// seconds
-					memcpy(btemp, argument + 6, 2);
-					vtemp = atoi((char*) btemp);
-					if (vtemp > 60) return;
-					time.Seconds = vtemp;
+				// seconds
+				memcpy(btemp, argument + 6, 2);
+				vtemp = atoi((char*) btemp);
+				if (vtemp > 60)
+					return;
+				time.Seconds = vtemp;
 
-					HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
+				HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
 			}
 			break;
 		}
 		case RX_CMD_BCN: {
-					if(WeakCharCompare(argument, "ON")) {
-						HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-					} else if(WeakCharCompare(argument, "OFF")) {
-						HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
-					}
-					break;
-				}
-
-		case RX_CMD_CAL: {
-			Calibrate();
-			break;
-		}
-		/*
-		case RX_CMD_SIM: {
-			if (WeakCharCompare(argument, "ENABLE")) {
-				CMD_excuteSIM_ENABLE();
-			} else if(WeakCharCompare(argument, "DISABLE")) {
-				CMD_excuteSIM_DISABLE();
-			} else if(WeakCharCompare(argument, "ACTIVATE")) {
-				CMD_excuteSIM_ACTIVATE();
+			if (WeakCharCompare(argument, "ON")) {
+				cmd_echo = ECHO_BCN_ON;
+				HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+			} else if (WeakCharCompare(argument, "OFF")) {
+				cmd_echo = ECHO_BCN_OFF;
+				HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
 			}
 			break;
 		}
 
+		case RX_CMD_CAL: {
+			cmd_echo = ECHO_CAL;
+			Calibrate();
+			break;
+		}
+
+		case RX_CMD_SIM: {
+			if (WeakCharCompare(argument, "ENABLE")) {
+				cmd_echo = ECHO_SIM_ENABLE;
+				isSimulationEnable = TRUE;
+				//CMD_excuteSIM_ENABLE();
+			} else if(WeakCharCompare(argument, "DISABLE")) {
+				cmd_echo = ECHO_SIM_DISABLE;
+				isSimulationEnable = FALSE;
+				isSimulationMode = FALSE;
+				//CMD_excuteSIM_DISABLE();
+			} else if(WeakCharCompare(argument, "ACTIVATE")) {
+				if(isSimulationEnable == TRUE) {
+					cmd_echo = ECHO_SIM_ACTIVATE;
+					isSimulationMode = TRUE;
+				}
+				//CMD_excuteSIM_ACTIVATE();
+			}
+			break;
+		}
+/*
 		case RX_CMD_REL: {
 			if(WeakCharCompare(argument, "HS")) {
 				CMD_excuteREL_HS();
@@ -1322,6 +1333,8 @@ void vStateManagingTask(void *argument)
   	case F_LAUNCH_WAIT:
   		if (altitude > VEHICLE_ASCENT_THRESHOLD) {
   			vehicle_state = F_ASCENT;
+  			isHSDeployed = FALSE;
+  			isPCDeployed = FALSE;
   		}
   		break;
   	case F_ASCENT:
@@ -1329,6 +1342,7 @@ void vStateManagingTask(void *argument)
   			// PC deploy if needed
 //  			Servo_Write(&hservo1, 180);	// deploy heat shield
   			vehicle_state = F_HS_DEPLOYED;
+  			isHSDeployed = TRUE;
   		}
   		break;
   	case F_HS_DEPLOYED:
@@ -1336,6 +1350,7 @@ void vStateManagingTask(void *argument)
   			Servo_Write(&hservo2, 180);	// release heat shield
   			Servo_Write(&hservo3, 180);	// deploy parachute
   			vehicle_state = F_PC_DEPLOYED;
+  			isPCDeployed = TRUE;
   		}
   		break;
   	case F_PC_DEPLOYED:
@@ -1675,15 +1690,15 @@ void vTransmitCallback(void *argument)
 	telemetry.seconds = sTime.Seconds;
 	telemetry.subseconds = g_SubSeconds;
 	telemetry.packet_count = packetCount++;
-	telemetry.mode = 0;
-	telemetry.state = 1;
+	telemetry.mode = isSimulationMode;
+	telemetry.state = vehicle_state;
 	telemetry.altitude = sensor_data_container.altitude;
 	telemetry.air_speed = sensor_data_container.air_speed;
-	telemetry.heat_shield = 0;
-	telemetry.parachute = 0;
+	telemetry.heat_shield = isHSDeployed;
+	telemetry.parachute = isPCDeployed;
 	telemetry.temperature = sensor_data_container.temperature;
 	telemetry.voltage = sensor_data_container.battery_voltage;
-	telemetry.pressure = sensor_data_container.pressure;
+	telemetry.pressure = sensor_data_container.pressure /100000.0f;
 	telemetry.GPS_time_hours = gps_data.hours;
 	telemetry.GPS_time_minutes = gps_data.minutes;
 	telemetry.GPS_time_seconds = gps_data.seconds;
@@ -1691,10 +1706,10 @@ void vTransmitCallback(void *argument)
 	telemetry.GPS_latitude = gps_data.latitude;
 	telemetry.GPS_longitude = gps_data.longitude;
 	telemetry.GPS_sats = gps_data.satellites;
-	telemetry.tilt_x = sensor_data_container.tilt_x*180/PI; // Axis Change
-	telemetry.tilt_y = sensor_data_container.tilt_y*180/PI;
-	telemetry.rot_z = sensor_data_container.rot_z;
-	telemetry.cmd_echo = 0xFF;
+	telemetry.tilt_x = sensor_data_container.tilt_x *180/PI; // Axis Change
+	telemetry.tilt_y = sensor_data_container.tilt_y *180/PI;
+	telemetry.rot_z = sensor_data_container.rot_z   *180/PI;
+	telemetry.cmd_echo = cmd_echo;
 
 	// Push Telemetry
 	cb_push(&cb_tle, &telemetry);

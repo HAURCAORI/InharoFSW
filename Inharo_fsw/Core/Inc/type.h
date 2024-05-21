@@ -122,7 +122,7 @@ typedef struct Telemetry {
 	uint8_t parachute;
 	float temperature;
 	float voltage;
-	uint32_t pressure;
+	float pressure;
 	uint8_t GPS_time_hours;
 	uint8_t GPS_time_minutes;
 	uint8_t GPS_time_seconds;
@@ -135,6 +135,40 @@ typedef struct Telemetry {
 	float rot_z;
 	uint16_t cmd_echo;
 } Telemetry;
+
+typedef enum VehicleStateTypeDef{
+	VEHICLE_RESET = 	0x00,
+	F_LAUNCH_WAIT = 	0x01,
+	F_ASCENT = 				0x02,
+	F_HS_DEPLOYED = 	0x03,
+	F_PC_DEPLOYED = 	0x04,
+	F_LANDED = 				0x05,
+
+	SIM_ENABLED = 		0x10,
+	S_LAUNCH_WAIT = 	0x11,
+	S_ASCENT = 				0x12,
+	S_HS_DEPLOYED = 	0x13,
+	S_PC_DEPLOYED = 	0x14,
+	S_LANDED = 				0x15
+}VehicleStateTypeDef;
+
+typedef enum CommandEcho{
+  ECHO_NONE					= 0X00,
+	ECHO_CX_ON 				= 0x01,
+	ECHO_CX_OFF 			= 0x02,
+	ECHO_ST_UTC 			= 0x03,
+	ECHO_ST_GPS				= 0x04,
+	ECHO_SIM_ENABLE 	= 0x05,
+	ECHO_SIM_ACTIVATE	= 0x06,
+	ECHO_SIM_DISABLE	= 0x07,
+	ECHO_CAL					= 0x08,
+	ECHO_BCN_ON				= 0x09,
+	ECHO_BCN_OFF			= 0x0A,
+	ECHO_REL_HS				= 0x0B,
+	ECHO_DEP_PC				= 0x0C,
+	ECHO_INIT					= 0xFE,
+	ECHO_RESET				= 0xFF
+} CommandEcho;
 
 #pragma pack(pop)
 
