@@ -28,6 +28,7 @@
 #include <math.h>
 #include "converter.h"
 #include "circularBuffer.h"
+#include "command.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,7 +62,7 @@ typedef struct{
 	float battery_voltage;
 	// airspeed, scale: 100(x)
 	float air_speed;
-	int altitude_updated_flag;
+	uint8_t isUpdated;
 }SensorDataContainerTypeDef;
 
 
@@ -126,42 +127,42 @@ double r_pressure_sea_level = 1.0 / ( 101325.0 * 100.0 );
 osThreadId_t MainHandle;
 const osThreadAttr_t Main_attributes = {
   .name = "Main",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for GPS */
 osThreadId_t GPSHandle;
 const osThreadAttr_t GPS_attributes = {
   .name = "GPS",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for StateManaging */
 osThreadId_t StateManagingHandle;
 const osThreadAttr_t StateManaging_attributes = {
   .name = "StateManaging",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for Receive */
 osThreadId_t ReceiveHandle;
 const osThreadAttr_t Receive_attributes = {
   .name = "Receive",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for Debug */
 osThreadId_t DebugHandle;
 const osThreadAttr_t Debug_attributes = {
   .name = "Debug",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for TransmitLoop */
 osThreadId_t TransmitLoopHandle;
 const osThreadAttr_t TransmitLoop_attributes = {
   .name = "TransmitLoop",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for SensorReading */
@@ -204,6 +205,7 @@ uint8_t isCommunication	 		= IH_CX_OFF;
 uint8_t isTimeSetGPS 		 		= FALSE;
 uint8_t isSimulationMode 		= FALSE;
 uint8_t isSimulationEnable 	= FALSE;
+uint32_t sim_pressure = 10132500;
 
 //
 SensorDataContainerTypeDef sensor_data_container = {0, };
@@ -252,25 +254,9 @@ static void _BMP390_Init(void);
 static void _BNO055_Init(void);
 static void _SD_Init(void);
 static void _Servo_Init(void);
-int Calibrate(void);
+void Calibrate(void);
 void Backup(void);
 void BackupRecovery(void);
-CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg);
-void CMD_excuteCX_ON(void);
-void CMD_excuteCX_OFF(void);
-void CMD_excuteST_TIME(const uint8_t *argument);
-void CMD_excuteST_GPS(void);
-void CMD_excuteSIM_ENABLE(void);
-void CMD_excuteSIM_ACTIVATE(void);
-void CMD_excuteSIM_DISABLE(void);
-void CMD_excuteSIMP(int argument);
-void CMD_excuteCAL(void);
-void CMD_excuteBCN_ON(void);
-void CMD_excuteBCN_OFF(void);
-void CMD_excuteDEP_PC(void);
-void CMD_excuteREL_HS(void);
-void CMD_excuteINIT(void);
-void CMD_excuteRESET(void);
 
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 /* USER CODE END PFP */
@@ -326,12 +312,11 @@ int main(void)
   _BNO055_Init();
   _SD_Init();
   _Servo_Init();
-  if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0){
-  	//BackupRecovery();
-  }
 
   cb_init(&cb_tle, TLE_Circular_Buffer_Size, sizeof(Telemetry));
   logi("Initialized");
+
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -417,7 +402,6 @@ int main(void)
   /* USER CODE END 3 */
 }
 
-
 /* USER CODE BEGIN 4 */
 
 
@@ -483,7 +467,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   	osSemaphoreRelease(ReceiveSemaphoreHandle);
   }
   else if(huart->Instance == USART1) {
+#ifdef GET_GPS
   	CDC_Transmit_FS(uart1_rx_buffer, 1);
+#endif
 		// Buffer Timeout
 		if (HAL_GetTick() - receive_tick > 100) {
 			gps_rx_buffer.isReceiving = FALSE;
@@ -589,7 +575,10 @@ static void _Servo_Init(void){
 	Servo_Write(&hservo3, 0);
 }
 
-int Calibrate(void){
+void Calibrate(void){
+	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 100) != osOK) {
+		return;
+	}
 	bno055_calibration_data_t bno055_cal_data;
 
 	uint32_t cal_zero_altitude0 = 0;
@@ -614,8 +603,6 @@ int Calibrate(void){
 
 	// calibrate velocity calculation
 	DP_calcCalibrationFromADC(sensor_data_container.adc_1);
-
-	return 0;
 
 	// make calibration data for RTC backup register
 	union{
@@ -665,8 +652,8 @@ int Calibrate(void){
 	uint16_to_uint32.val_uint16[1] 	= bno055_cal_data.radius.accel;
 	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
 
+
 	// save calibration data
-  //HAL_PWR_EnableBkUpAccess();
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3,		cal_zero_altitude1);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6,		cal_zero_velocity0);
@@ -677,11 +664,15 @@ int Calibrate(void){
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
-  //HAL_PWR_DisableBkUpAccess();
 
-	return 0;
+  osSemaphoreRelease(TransmitSemaphoreHandle);
 }
+
 void Backup(void){
+	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 100) != osOK) {
+			return;
+	}
+
 	bno055_calibration_data_t bno055_cal_data;
 	uint32_t	bkp_vehicle =0;
 	uint32_t	bkp_packet_count = 0;
@@ -763,7 +754,6 @@ void Backup(void){
 	cal_rad_mag_rad_acc     				= uint16_to_uint32.val_uint32;
 
 	// save calibration data
-  HAL_PWR_EnableBkUpAccess();
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0,		bkp_vehicle);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1,		bkp_packet_count);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2,		cal_zero_altitude0);
@@ -778,12 +768,15 @@ void Backup(void){
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR11, 	cal_acc_ofst_x_acc_ofst_y);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR12, 	cal_acc_ofst_z_reserved);
   HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR13, 	cal_rad_mag_rad_acc);
-  HAL_PWR_DisableBkUpAccess();
 
-	return;
-
+  osSemaphoreRelease(TransmitSemaphoreHandle);
 }
+
 void BackupRecovery(void){
+	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 100) != osOK) {
+				return;
+	}
+
 	bno055_calibration_data_t bno055_cal_data;
 	uint32_t 	bkp_vehicle;
 	uint32_t 	bkp_packet_count;
@@ -838,7 +831,15 @@ void BackupRecovery(void){
 	vehicle_state = uint32_to_uint8.val_uint8[2];
 //	val_CX = 0b00000010U & uint32_to_uint8.val_uint8[3];
 
-	packetCount = bkp_packet_count;
+	if((vehicle_state & STATE_MASK) == STATE_LAUNCH_WAIT || (vehicle_state & STATE_MASK) == STATE_LANDED) {
+		vehicle_state = VEHICLE_RESET;
+	}
+
+	if(vehicle_state == VEHICLE_RESET) {
+		packetCount = 0;
+	} else {
+		packetCount = bkp_packet_count;
+	}
 
 	uint32_to_double.val_uint32[0] = cal_zero_altitude0;
 	uint32_to_double.val_uint32[1] = cal_zero_altitude1;
@@ -877,7 +878,7 @@ void BackupRecovery(void){
 
 	bno055_setCalibrationData(bno055_cal_data);
 
-	return;
+	osSemaphoreRelease(TransmitSemaphoreHandle);
 }
 
 
@@ -947,96 +948,50 @@ void RFParsing(uint8_t *data, size_t length) {
 
 		uint64_t Icommand = 0;
 
-		RTC_TimeTypeDef time = { 0 };
-		uint8_t btemp[2];
-		uint8_t vtemp;
-
 		memcpy(&Icommand, command, 8);
 		switch (Icommand) {
 		case RX_CMD_CX: {
 			if (WeakCharCompare(argument, "ON")) {
-				cmd_echo = ECHO_CX_ON;
-				isCommunication = IH_CX_ON;
-				//CMD_excuteCX_ON();
+				CMD_excuteCX_ON();
 			} else {
-				cmd_echo = ECHO_CX_OFF;
-				isCommunication = IH_CX_OFF;
-				//CMD_excuteCX_OFF();
+				CMD_excuteCX_OFF();
 			}
 			break;
 		}
 
 		case RX_CMD_ST: {
 			if (WeakCharCompare(argument, "GPS")) {
-				cmd_echo = ECHO_ST_GPS;
-				isTimeSetGPS = TRUE;
-				//CMD_excuteST_GPS();
+				CMD_excuteST_GPS();
 			} else {
-				cmd_echo = ECHO_ST_UTC;
-				//CMD_excuteST_TIME(argument);
-
-				// hours
-				memcpy(btemp, argument, 2);
-				vtemp = atoi((char*) btemp);
-				if (vtemp > 24)
-					return;
-				time.Hours = vtemp;
-
-				// minutes
-				memcpy(btemp, argument + 3, 2);
-				vtemp = atoi((char*) btemp);
-				if (vtemp > 60)
-					return;
-				time.Minutes = vtemp;
-
-				// seconds
-				memcpy(btemp, argument + 6, 2);
-				vtemp = atoi((char*) btemp);
-				if (vtemp > 60)
-					return;
-				time.Seconds = vtemp;
-
-				HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
+				CMD_excuteST_TIME(argument);
 			}
 			break;
 		}
+
 		case RX_CMD_BCN: {
 			if (WeakCharCompare(argument, "ON")) {
-				cmd_echo = ECHO_BCN_ON;
-				HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
+				CMD_excuteBCN_ON();
 			} else if (WeakCharCompare(argument, "OFF")) {
-				cmd_echo = ECHO_BCN_OFF;
-				HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
+				CMD_excuteBCN_OFF();
 			}
 			break;
 		}
 
 		case RX_CMD_CAL: {
-			cmd_echo = ECHO_CAL;
-			Calibrate();
+			CMD_excuteCAL();
 			break;
 		}
 
 		case RX_CMD_SIM: {
 			if (WeakCharCompare(argument, "ENABLE")) {
-				cmd_echo = ECHO_SIM_ENABLE;
-				isSimulationEnable = TRUE;
-				//CMD_excuteSIM_ENABLE();
+				CMD_excuteSIM_ENABLE();
 			} else if(WeakCharCompare(argument, "DISABLE")) {
-				cmd_echo = ECHO_SIM_DISABLE;
-				isSimulationEnable = FALSE;
-				isSimulationMode = FALSE;
-				//CMD_excuteSIM_DISABLE();
+				CMD_excuteSIM_DISABLE();
 			} else if(WeakCharCompare(argument, "ACTIVATE")) {
-				if(isSimulationEnable == TRUE) {
-					cmd_echo = ECHO_SIM_ACTIVATE;
-					isSimulationMode = TRUE;
-				}
-				//CMD_excuteSIM_ACTIVATE();
+				CMD_excuteSIM_ACTIVATE();
 			}
 			break;
 		}
-/*
 		case RX_CMD_REL: {
 			if(WeakCharCompare(argument, "HS")) {
 				CMD_excuteREL_HS();
@@ -1057,7 +1012,11 @@ void RFParsing(uint8_t *data, size_t length) {
 			CMD_excuteINIT();
 			break;
 		}
-		*/
+		case RX_CMD_SIMP: {
+			sim_pressure = atoi((char*) argument)*100;
+			cmd_echo = ECHO_SIMP;
+			break;
+		}
 		default:
 			break;
 		}
@@ -1070,174 +1029,6 @@ void RFParsing(uint8_t *data, size_t length) {
 	}
 }
 
-CMD_CommandCaseTypeDef CMD_parseSIMP(uint8_t *message, int *pArg) {
-	uint8_t ch;
-	int i = 0;
-	int simp = 0;
-
-	while (1) {
-		ch = message[i];
-		if ('0' <= ch && ch <= '9') {
-			simp = simp * 10 + ch - '0';
-			i++;
-		} else if (ch == '\0') {
-			break;
-		} else {
-			*pArg = 0;
-			return CMD_ERR_ARG;
-		}
-	}
-	*pArg = simp;
-	return CMD_SIMP;
-}
-
-void CMD_excuteCX_ON(void) {
-	logi("CMD_CX_ON");
-	isCommunication = IH_CX_ON;
-
-
-	uint32_t bkpdata;
-	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
-	bkpdata |= (1U << 1);
-	HAL_PWR_EnableBkUpAccess();
-	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
-	HAL_PWR_DisableBkUpAccess();
-
-}
-
-void CMD_excuteCX_OFF(void) {
-	logi("CMD_CX_OFF");
-	isCommunication = IH_CX_OFF;
-
-
-	uint32_t bkpdata;
-	bkpdata = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP0R);
-	bkpdata &= ~(1U << 1);
-	HAL_PWR_EnableBkUpAccess();
-	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP0R, bkpdata);
-	HAL_PWR_DisableBkUpAccess();
-
-}
-
-void CMD_excuteST_TIME(const uint8_t *argument) {
-	logi("CMD_SET_UTC_TIME");
-	RTC_TimeTypeDef time = { 0 };
-	uint8_t btemp[2];
-	uint8_t vtemp;
-	// hours
-	memcpy(btemp, argument, 2);
-	vtemp = atoi((char*) btemp);
-	if (vtemp > 24) return;
-	time.Hours = vtemp;
-
-	// minutes
-	memcpy(btemp, argument + 3, 2);
-	vtemp = atoi((char*) btemp);
-	if (vtemp > 60) return;
-	time.Minutes = vtemp;
-
-	// seconds
-	memcpy(btemp, argument + 6, 2);
-	vtemp = atoi((char*) btemp);
-	if (vtemp > 60) return;
-	time.Seconds = vtemp;
-
-	HAL_RTC_SetTime(&hrtc, &time, RTC_FORMAT_BIN);
-}
-void CMD_excuteST_GPS(void) {
-	logi("CMD_SET_GPS_TIME");
-	isTimeSetGPS = TRUE;
-}
-void CMD_excuteSIM_ENABLE(void) {
-	logi("CMD_SIM_ENABLE");
-	// ToDo: implement execution code
-	// if state is flight: deny
-	// if state is simulation: do nothing
-	// else: change state to SIM_ENABLED
-	logd("not implemented.");
-}
-void CMD_excuteSIM_ACTIVATE(void) {
-	logi("CMD_SIM_ACTIVATE");
-	// ToDo: implement execution code
-	// if state is SIM_ENABLED: change it to S_LAUNCH_WAIT
-	// else: do nothing
-	logd("not implemented.");
-}
-void CMD_excuteSIM_DISABLE(void) {
-	logi("CMD_SIM_DISABLE");
-	// ToDo: implement execution code
-	// if state is one of simulation mode: change it to VEHICLE_RESET
-	logd("not implemented.");
-}
-void CMD_excuteSIMP(int argument) {
-	// ToDo: implement execution code
-	// if this is the first simp data after sim_activate: set simulated zero altitude calibration
-	// else: change simulated pressure and change simulated altitude and raise simulated altitude update flag
-	logd("not implemented.");
-}
-
-void CMD_excuteCAL(void) {
-	logi("CMD_CAL");
-	int ret = Calibrate();
-	if (ret) {
-		loge("Perform 8-figure for IMU calibration.");
-	} else {
-		logi("calibrated all sensors and saved the data.");
-	}
-}
-
-void CMD_excuteBCN_ON(void) {
-	logi("CMD_BCN_ON");
-	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-}
-
-void CMD_excuteBCN_OFF(void) {
-	logi("CMD_BCN_OFF");
-	HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_RESET);
-}
-
-
-void CMD_excuteDEP_PC(void) {
-	logi("CMD_DEP_PC");
-	int deg = Servo_Read(&hservo2);
-	//ToDo: implement state detection and state transfer
-
-	// not in flight mode nor in simulation mode
-	if (deg < 0) {
-		Error_Handler();
-	}
-	if (deg >= 90) {
-		Servo_Write(&hservo2, 0);
-	} else {
-		Servo_Write(&hservo2, 180);
-	}
-}
-void CMD_excuteREL_HS(void) {
-	logi("CMD_REL_HS");
-	int deg = Servo_Read(&hservo3);
-	//ToDo: implement state detection and state transfer
-
-	// not in flight mode nor in simulation mode
-	if (deg < 0) {
-		Error_Handler();
-	}
-	if (deg >= 90) {
-		Servo_Write(&hservo3, 0);
-	} else {
-		Servo_Write(&hservo3, 180);
-	}
-}
-void CMD_excuteINIT(void) {
-	logi("CMD_INIT");
-	// ToDo: implement execution code
-	// if state is VEHICLE_RESET: change it to F_LAUNCH_WAIT
-}
-void CMD_excuteRESET(void) {
-	logi("CMD_RESET");
-	// ToDo: implement state transfer to vehicle_reset state
-	//Backup();
-	NVIC_SystemReset();
-}
 
 /* USER CODE END 4 */
 
@@ -1260,13 +1051,25 @@ void vMainTask(void *argument)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
   //HAL_UART_Receive_IT(&huart3, (uint8_t *) buffer, sizeof(buffer));
   //uint8_t data[]= {0x7E, 0x00, 0x0A, 0x01, 0x01, 0xCC, 0xCC, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x71};
+  Buzzer_Once();
+  osDelay(100);
+  Buzzer_Once();
+
+
+  uint32_t flags;
+
+  CameraOff();
 
   for(;;)
   {
-    osDelay(1000);
+  	flags = osEventFlagsWait(CommandEventHandle, ACT_CAMERA, osFlagsWaitAny, 1000);
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-
-    //HAL_UART_Transmit(&huart3, (uint8_t*)data, sizeof(data), 1000);
+    if(flags & osFlagsError) { continue; }
+    if(flags & ACT_CAMERA) {
+    	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+    	CameraOn();
+    	CameraRecord();
+    }
   }
   /* USER CODE END 5 */
 }
@@ -1335,97 +1138,66 @@ void vStateManagingTask(void *argument)
   /* USER CODE BEGIN vStateManagingTask */
 	// only cares about automatic state transfer from altitude change
 //	VehicleStateTypeDef vehicle_state;
+
+	if(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0)!= 0){
+		BackupRecovery();
+	}
+
 	int32_t altitude = 0, old_altitude = 0, max_altitude = 0;
-	int32_t s_altitude = 0, s_old_altitude = 0, s_max_altitude = 0;
   /* Infinite loop */
   for(;;)
   {
-  	// altitude update
-  	//while(sensor_data_container.altitude_updated_flag == 0); // false when the flag is set
+  	osDelay(100);
+  	if(sensor_data_container.isUpdated == FALSE) { continue; }
 
-  	// add blocking start here
   	old_altitude = altitude;
   	altitude = sensor_data_container.altitude;
-  	sensor_data_container.altitude_updated_flag = 0;
-  	if ( altitude > max_altitude ) max_altitude = altitude;
+  	max_altitude = MAX(altitude,max_altitude);
+  	sensor_data_container.isUpdated = FALSE;
 
-//  	s_old_altitude = altitude;
-//  	s_altitude = sensor_data_container.s_altitude;
-//  	sensor_data_container.s_altitude_updated_flag = 0;
-//  	if ( s_altitude > s_max_altitude ) s_max_altitude = s_altitude;
 
-  	switch(vehicle_state){
-  	case F_LAUNCH_WAIT:
+  	switch(vehicle_state & STATE_MASK) {
+  	case STATE_LAUNCH_WAIT: {
   		if (altitude > VEHICLE_ASCENT_THRESHOLD) {
-  			vehicle_state = F_ASCENT;
-  			isHSDeployed = FALSE;
-  			isPCDeployed = FALSE;
+  			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_ASCENT;
+  			Backup();
   		}
-  		break;
-  	case F_ASCENT:
-  		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD){
-  			// PC deploy if needed
-//  			Servo_Write(&hservo1, 180);	// deploy heat shield
-  			vehicle_state = F_HS_DEPLOYED;
-  			isHSDeployed = TRUE;
-  		}
-  		break;
-  	case F_HS_DEPLOYED:
-  		if (altitude < VEHICLE_PC_THRESHOLD){
-  			Servo_Write(&hservo2, 180);	// release heat shield
-  			Servo_Write(&hservo3, 180);	// deploy parachute
-  			vehicle_state = F_PC_DEPLOYED;
-  			isPCDeployed = TRUE;
-  		}
-  		break;
-  	case F_PC_DEPLOYED:
-  		if ((old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
-  				(old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement CX OFF
-  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-  			vehicle_state = F_LANDED;
-  		}
-  		break;
-  	case F_LANDED:
-  		HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-  		break;
-  	case S_LAUNCH_WAIT:
-  		if (s_altitude > VEHICLE_ASCENT_THRESHOLD) {
-  			vehicle_state = S_ASCENT;
-  		}
-  		break;
-  	case S_ASCENT:
-  		if (s_max_altitude - s_altitude > VEHICLE_HS_THRESHOLD){
-  			// PC deploy if needed
-//  			Servo_Write(&hservo1, 180);	// deploy heat shield
-  			vehicle_state = S_HS_DEPLOYED;
-  		}
-  		break;
-  	case S_HS_DEPLOYED:
-  		if (s_altitude < VEHICLE_PC_THRESHOLD){
-  			Servo_Write(&hservo2, 180);	// release heat shield
-  			Servo_Write(&hservo3, 180);	// deploy parachute
-  			vehicle_state = S_PC_DEPLOYED;
-  		}
-  		break;
-  	case S_PC_DEPLOYED:
-  		if ((s_old_altitude - altitude) < VEHICLE_LAND_THRESHOLD &&\
-  				(s_old_altitude - altitude) > -VEHICLE_LAND_THRESHOLD ){
-  			// ToDo: implement CX OFF
-  			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-  			vehicle_state = S_LANDED;
-  		}
-  		break;
-  	case S_LANDED:
-			HAL_GPIO_WritePin(BUZ_GPIO_Port, BUZ_Pin, GPIO_PIN_SET);
-			break;
-  	default:
-  		// VEHICLE_RESET, SIM_ENABLED
-  		// do nothing, basically...
-  		// doing commanded task will be implemented in vRecieveTask(); function
   		break;
   	}
-  	osDelay(100);
+  	case STATE_ASCENT: {
+  		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD && altitude > 300){
+  			isHSDeployed = TRUE;
+
+  			//TODO: Heat shield deploy code
+
+  			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_HS_DEPLOYED;
+  			Backup();
+  		}
+  	  break;
+  	}
+  	case STATE_HS_DEPLOYED: {
+  		if (altitude < VEHICLE_PC_THRESHOLD){
+  			isPCDeployed = TRUE;
+
+  			//TODO: Parachute deploy
+
+  			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_PC_DEPLOYED;
+  			Backup();
+  		}
+  	  break;
+  	}
+  	case STATE_PC_DEPLOYED: {
+  		if (abs(old_altitude - altitude) < VEHICLE_LAND_THRESHOLD && altitude < VEHICLE_ASCENT_THRESHOLD){
+  			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_LANDED;
+  			Backup();
+  		}
+  	  break;
+  	}
+  	case STATE_LANDED: {
+  		Buzzer_On();
+  		break;
+  	}
+  	}
   	// add blocking end here
   }
   /* USER CODE END vStateManagingTask */
@@ -1491,6 +1263,7 @@ void vDebugTask(void *argument)
   /* Infinite loop */
 	uint32_t event_flag;
 	uint16_t cmd = 0;
+
 	for (;;) {
 		event_flag = osEventFlagsWait(EventReceiveHandle, EVENT_RECEIVE_USB, osFlagsWaitAny, osWaitForever);
 		if(event_flag & osFlagsError) { continue; }
@@ -1515,7 +1288,28 @@ void vDebugTask(void *argument)
 				Servo_Write(&hservo2, 0);
 				break;
 			case DEBUG_CMD_CALIBRATION:
-				logd("%d", Calibrate());
+				//logd("%d", Calibrate());
+				break;
+			case DEBUG_CMD_CAMERA_ON:
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
+				osDelay(1000);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
+				osDelay(500);
+				Buzzer_Once();
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
+				osDelay(8000);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
+				Buzzer_Once();
+				osDelay(500);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
+				osDelay(1000);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
+				Buzzer_Once();
+				break;
+			case DEBUG_CMD_RECORD:
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_SET);
+				osDelay(100);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
 				break;
 				/*
 			case DEBUG_CMD_PRESSURE:
@@ -1585,7 +1379,7 @@ void vTransmitLoopTask(void *argument)
   		}
   	}
 
-
+  	osDelay(10);
   }
   /* USER CODE END vTransmitLoopTask */
 }
@@ -1593,6 +1387,10 @@ void vTransmitLoopTask(void *argument)
 /* vSensorReadingCallback function */
 void vSensorReadingCallback(void *argument)
 {
+	if(osSemaphoreAcquire(TransmitSemaphoreHandle, 100) != osOK) {
+		return;
+	}
+
   /* USER CODE BEGIN vSensorReadingCallback */
 	int64_t temperature;
 	uint64_t pressure;
@@ -1609,6 +1407,12 @@ void vSensorReadingCallback(void *argument)
 
 	// read bmp390
 	BMP390_GetValue(&temperature, &pressure, 50);
+
+	if(isSimulationMode == TRUE ){
+		pressure = sim_pressure;
+	}
+
+
 
 	// read bno055
 	bno055vector = bno055_getVectorAccelerometer();
@@ -1660,9 +1464,11 @@ void vSensorReadingCallback(void *argument)
   altitude = (powf(pressure_ratio, ALTITUDE_POWER_COEFFICIENT) - 1) * ALTITUDE_PRODUCT_COEFFICIENT; // *100
 
   // calculate tilt angle
-  double total_acc_r = 1 / sqrt(acc_x*acc_x + acc_y*acc_y + acc_z*acc_z);
-  tilt_x = asin( acc_x * total_acc_r );
-  tilt_y = asin( acc_y * total_acc_r );
+  double total_xz = sqrt(acc_x*acc_x + acc_z*acc_z);
+  double total_yz = sqrt(acc_y*acc_y + acc_z*acc_z);
+  tilt_x = atan2( acc_x / total_xz, acc_z / total_xz );
+  tilt_y = atan2( acc_y / total_yz, acc_z / total_yz );
+
 
 	// calculate battery voltage
   //battery_voltage = ADC1_CH0 / 4015 * 3.3 * 1.5 * 100;
@@ -1670,7 +1476,7 @@ void vSensorReadingCallback(void *argument)
   battery_voltage = adc_0 / 4095.0 * 3.3 * 1.5;
 
 	// calculate air speed
-  air_speed = DP_calculateAirSpeedComp(adc_1, pressure / 100.f, temperature / 100.f);
+  air_speed = DP_calculateAirSpeedIncomp(adc_1, pressure / 100.f, temperature / 100.f);
   air_speed /= 100;
 
 	// move data to sensor data container
@@ -1695,8 +1501,9 @@ void vSensorReadingCallback(void *argument)
   sensor_data_container.tilt_y = tilt_y;
   sensor_data_container.battery_voltage = battery_voltage;
   sensor_data_container.air_speed = air_speed;
-  sensor_data_container.altitude_updated_flag = 1;
+  sensor_data_container.isUpdated = TRUE;
 
+  osSemaphoreRelease(TransmitSemaphoreHandle);
   //logd("sensor");
   /* USER CODE END vSensorReadingCallback */
 }
@@ -1740,7 +1547,8 @@ void vTransmitCallback(void *argument)
 	cb_push(&cb_tle, &telemetry);
 	osEventFlagsSet(EventReceiveHandle, EVENT_RECEIVE_PUSH);
 
-	//logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
+
+	logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
   /* USER CODE END vTransmitCallback */
 }
 

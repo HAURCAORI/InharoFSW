@@ -16,6 +16,10 @@ extern "C" {
 #include "main.h"
 
 void Buzzer_Once();
+void Buzzer_OnceLong();
+void Buzzer_Triple();
+void Buzzer_On();
+void Buzzer_Off();
 
 #ifdef __cplusplus
 }

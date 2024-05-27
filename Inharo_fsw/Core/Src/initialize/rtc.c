@@ -38,7 +38,7 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-  if (!(HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) & UINT32_MAX)) return;
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) != 0) return;
 
   /* USER CODE END Check_RTC_BKUP */
 

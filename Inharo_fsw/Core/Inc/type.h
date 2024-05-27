@@ -17,6 +17,8 @@
 #define DEBUG_CMD_PRESSURE 		0x7270
 #define DEBUG_CMD_SERVO_180		0x6F73
 #define DEBUG_CMD_SERVO_0			0x6673
+#define DEBUG_CMD_CAMERA_ON		0x6D63
+#define DEBUG_CMD_RECORD			0x6572
 
 #define EVENT_RECEIVE_SUCCESS 1<<0
 #define EVENT_RECEIVE_FAIL 		1<<1
@@ -25,6 +27,8 @@
 #define EVENT_RECEIVE_GPS 		1<<4
 #define EVENT_RECEIVE_ACK 		1<<5
 #define EVENT_RECEIVE_PUSH		1<<6
+
+#define ACT_CAMERA						1<<0
 
 
 #define USB_BUFFER_SIZE 8
@@ -53,6 +57,7 @@
 #define RX_CMD_DEP					0x504544		//'DEP'
 #define RX_CMD_RESET				0x534552		//'RES'
 #define RX_CMD_INIT					0x54494E49	//'INIT'
+#define RX_CMD_SIMP					0x504D4953	//'SIMP'
 
 
 #define IH_CX_OFF						0x00
@@ -136,20 +141,29 @@ typedef struct Telemetry {
 	uint16_t cmd_echo;
 } Telemetry;
 
-typedef enum VehicleStateTypeDef{
-	VEHICLE_RESET = 	0x00,
-	F_LAUNCH_WAIT = 	0x01,
-	F_ASCENT = 				0x02,
-	F_HS_DEPLOYED = 	0x03,
-	F_PC_DEPLOYED = 	0x04,
-	F_LANDED = 				0x05,
+#define STATE_LAUNCH_WAIT 		1<<0
+#define STATE_ASCENT 					1<<1
+#define STATE_HS_DEPLOYED 		1<<2
+#define STATE_PC_DEPLOYED 		1<<3
+#define STATE_LANDED 					1<<4
+#define STATE_MASK						0b01111111
+#define STATE_MASK_SIMULATION	0b10000000
 
-	SIM_ENABLED = 		0x10,
-	S_LAUNCH_WAIT = 	0x11,
-	S_ASCENT = 				0x12,
-	S_HS_DEPLOYED = 	0x13,
-	S_PC_DEPLOYED = 	0x14,
-	S_LANDED = 				0x15
+
+typedef enum VehicleStateTypeDef{
+	VEHICLE_RESET = 	0<<0,
+	F_LAUNCH_WAIT = 	1<<0,
+	F_ASCENT 			= 	1<<1,
+	F_HS_DEPLOYED = 	1<<2,
+	F_PC_DEPLOYED = 	1<<3,
+	F_LANDED 			= 	1<<4,
+
+	SIM_ENABLED 	= 	1<<7,
+	S_LAUNCH_WAIT = 	1<<7 | 1<<0,
+	S_ASCENT 			= 	1<<7 | 1<<1,
+	S_HS_DEPLOYED = 	1<<7 | 1<<2,
+	S_PC_DEPLOYED = 	1<<7 | 1<<3,
+	S_LANDED 			= 	1<<7 | 1<<4
 }VehicleStateTypeDef;
 
 typedef enum CommandEcho{
@@ -166,6 +180,7 @@ typedef enum CommandEcho{
 	ECHO_BCN_OFF			= 0x0A,
 	ECHO_REL_HS				= 0x0B,
 	ECHO_DEP_PC				= 0x0C,
+	ECHO_SIMP					= 0X0D,
 	ECHO_INIT					= 0xFE,
 	ECHO_RESET				= 0xFF
 } CommandEcho;

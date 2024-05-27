@@ -36,9 +36,9 @@ static cbResult cb_init(circular_buffer* cb, size_t capacity, size_t sz) {
 	return cb_ok;
 }
 
-static void cb_free(circular_buffer* cb) {
-	free(cb->buffer);
-}
+//static void cb_free(circular_buffer* cb) {
+//	free(cb->buffer);
+//}
 
 static void cb_push(circular_buffer *cb, const void *item)
 {

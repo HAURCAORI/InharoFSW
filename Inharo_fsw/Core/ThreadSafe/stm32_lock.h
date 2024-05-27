@@ -282,8 +282,7 @@ static inline void stm32_lock_init(LockingData_t *lock)
   for (size_t i = 0; i < STM32_LOCK_ARRAY_SIZE(lock->basepri); i++)
   {
     lock->basepri[i] = 0;
-  }
-  lock->nesting_level = 0;
+  }  lock->nesting_level = 0;
 }
 
 /**
