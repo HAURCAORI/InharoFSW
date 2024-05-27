@@ -132,6 +132,7 @@ void CMD_excuteINIT(void) {
 }
 
 void CMD_excuteRESET(void) {
+	//vehicle_state = VEHICLE_RESET;
 	cmd_echo = ECHO_RESET;
 	//Backup();
 	NVIC_SystemReset();

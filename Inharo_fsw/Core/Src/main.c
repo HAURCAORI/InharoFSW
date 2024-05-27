@@ -710,7 +710,7 @@ void Backup(void){
 	uint8_to_uint32.val_uint8[1] 		= 0;
 	uint8_to_uint32.val_uint8[2] 		= ( uint8_t ) vehicle_state;
 //	uint8_to_uint32.val_uint8[3]	 	= ( uint8_t ) ( ( ( val_CX & 0x01 ) << 1 ) | 0x01 );
-	uint8_to_uint32.val_uint8[3] 		= 1;
+	uint8_to_uint32.val_uint8[3] 		= isCommunication;
 	bkp_vehicle 										= uint8_to_uint32.val_uint32;
 
 	bkp_packet_count 								= packetCount;
@@ -828,12 +828,14 @@ void BackupRecovery(void){
 
 
 	uint32_to_uint8.val_uint32 = bkp_vehicle;
+	isCommunication = uint32_to_uint8.val_uint8[3] == 0 ? IH_CX_OFF : IH_CX_ON;
+
 	vehicle_state = uint32_to_uint8.val_uint8[2];
 //	val_CX = 0b00000010U & uint32_to_uint8.val_uint8[3];
 
 	if((vehicle_state & STATE_MASK) == STATE_LAUNCH_WAIT || (vehicle_state & STATE_MASK) == STATE_LANDED) {
 		vehicle_state = VEHICLE_RESET;
-	}
+  }
 
 	if(vehicle_state == VEHICLE_RESET) {
 		packetCount = 0;
@@ -1549,6 +1551,7 @@ void vTransmitCallback(void *argument)
 
 
 	logd("send : %d, %d", telemetry.packet_count, cb_count(&cb_tle));
+	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1,		packetCount);
   /* USER CODE END vTransmitCallback */
 }
 
