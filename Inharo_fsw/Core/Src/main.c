@@ -1155,7 +1155,6 @@ void vStateManagingTask(void *argument)
   	max_altitude = MAX(altitude,max_altitude);
   	sensor_data_container.isUpdated = FALSE;
 
-
   	switch(vehicle_state & STATE_MASK) {
   	case STATE_LAUNCH_WAIT: {
   		if (altitude > VEHICLE_ASCENT_THRESHOLD) {
@@ -1168,7 +1167,8 @@ void vStateManagingTask(void *argument)
   		if (max_altitude - altitude > VEHICLE_HS_THRESHOLD && altitude > 300){
   			isHSDeployed = TRUE;
 
-  			//TODO: Heat shield deploy code
+  			// deploy heat shield
+  			Servo_Write(&hservo1, 180);
 
   			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_HS_DEPLOYED;
   			Backup();
@@ -1179,7 +1179,11 @@ void vStateManagingTask(void *argument)
   		if (altitude < VEHICLE_PC_THRESHOLD){
   			isPCDeployed = TRUE;
 
-  			//TODO: Parachute deploy
+  			// release heat shield
+  			Servo_Write(&hservo2, 180);
+  			// deploy parachute
+  			Servo_Write(&hservo3, 180);
+
 
   			vehicle_state = (vehicle_state & STATE_MASK_SIMULATION) | STATE_PC_DEPLOYED;
   			Backup();
