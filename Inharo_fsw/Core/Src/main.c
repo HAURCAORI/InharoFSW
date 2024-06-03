@@ -110,7 +110,7 @@ double r_pressure_sea_level = 1.0 / ( 101325.0 * 100.0 );
 
 // scale 1
 #define VEHICLE_ASCENT_THRESHOLD 	5
-#define VEHICLE_HS_THRESHOLD 			5
+#define VEHICLE_HS_THRESHOLD 			10
 #define VEHICLE_PC_THRESHOLD 			100
 #define VEHICLE_LAND_THRESHOLD 		1
 
@@ -1060,7 +1060,7 @@ void vMainTask(void *argument)
 
   uint32_t flags;
 
-  CameraOff();
+  //CameraOff();
 
   for(;;)
   {
@@ -1069,8 +1069,8 @@ void vMainTask(void *argument)
     if(flags & osFlagsError) { continue; }
     if(flags & ACT_CAMERA) {
     	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-    	CameraOn();
-    	CameraRecord();
+    	//CameraOn();
+    	//CameraRecord();
     }
   }
   /* USER CODE END 5 */
