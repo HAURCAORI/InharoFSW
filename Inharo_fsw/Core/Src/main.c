@@ -571,7 +571,7 @@ static void _Servo_Init(void){
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start_IT(&htim3, TIM_CHANNEL_3);
 	Servo_Write(&hservo1, 0);
-	Servo_Write(&hservo2, 0);
+	Servo_Write(&hservo2, 180);
 	Servo_Write(&hservo3, 0);
 }
 
@@ -1182,7 +1182,7 @@ void vStateManagingTask(void *argument)
   			isPCDeployed = TRUE;
 
   			// release heat shield
-  			Servo_Write(&hservo2, 180);
+  			Servo_Write(&hservo2, 0);
   			// deploy parachute
   			Servo_Write(&hservo3, 180);
 
