@@ -14,6 +14,8 @@ int Calibrate(void);
 void Buzzer_On();
 void Buzzer_Off();
 
+extern Servo_HandleTypeDef hservo1, hservo2, hservo3;
+
 void CMD_excuteCX_ON(void) {
 	cmd_echo = ECHO_CX_ON;
 	isCommunication = IH_CX_ON;
@@ -108,13 +110,15 @@ void CMD_excuteBCN_OFF(void) {
 
 void CMD_excuteDEP_PC(void) {
 	cmd_echo = ECHO_DEP_PC;
-	//ToDO: implementation
+	int deg = Servo_Read(&hservo3);
+	Servo_Write(&hservo3, 180-deg);
 
 }
 
 void CMD_excuteREL_HS(void) {
 	cmd_echo = ECHO_REL_HS;
-	//ToDO: implementation
+	int deg = Servo_Read(&hservo2);
+	Servo_Write(&hservo2, 180-deg);
 }
 
 void CMD_excuteINIT(void) {
