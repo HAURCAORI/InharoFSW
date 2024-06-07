@@ -27,9 +27,9 @@ void UpdateTime() {
 void log_format(const char* tag, const char* message, va_list args) {
 	UpdateTime();
 
-	printf("%02d:%02d:%02d,%03lu[%s] ", sTime.Hours, sTime.Minutes, sTime.Seconds, g_SubSeconds, tag);
-	vprintf(message, args);
-	printf("\r\n");
+	//printf("%02d:%02d:%02d,%03lu[%s] ", sTime.Hours, sTime.Minutes, sTime.Seconds, g_SubSeconds, tag);
+	//vprintf(message, args);
+	//printf("\r\n");
 }
 
 void logi(const char* message, ...) {
