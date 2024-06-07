@@ -26,13 +26,14 @@ void UpdateTime() {
 
 void log_format(const char* tag, const char* message, va_list args) {
 	UpdateTime();
-
+	return;
 	printf("%02d:%02d:%02d,%03lu[%s] ", sTime.Hours, sTime.Minutes, sTime.Seconds, g_SubSeconds, tag);
 	vprintf(message, args);
 	printf("\r\n");
 }
 
 void logi(const char* message, ...) {
+	return;
 	va_list args;
 	va_start(args, message);
 	log_format("INFO", message, args);
@@ -40,6 +41,7 @@ void logi(const char* message, ...) {
 }
 
 void logd(const char* message, ...) {
+	return;
 	va_list args;
 	va_start(args, message);
 	log_format("DEBUG", message, args);
@@ -47,6 +49,7 @@ void logd(const char* message, ...) {
 }
 
 void loge(const char* message, ...) {
+	return;
 	va_list args;
 	va_start(args, message);
 	log_format("ERROR", message, args);

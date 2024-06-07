@@ -103,6 +103,8 @@ typedef enum{
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+//#define DEBUG_MODE 1
+
 #define ALTITUDE_POWER_COEFFICIENT ( (double) 0.190263105239812 )
 #define ALTITUDE_PRODUCT_COEFFICIENT ( (double) -4.433076923076923e+4)
 double r_pressure_sea_level = 1.0 / ( 101325.0 * 100.0 );
@@ -1275,6 +1277,7 @@ void vDebugTask(void *argument)
 		if(event_flag & osFlagsError) { continue; }
 
 		if (event_flag & EVENT_RECEIVE_USB) {
+#ifdef DEBUG_MODE
 			Buzzer_Once();
 			memcpy(&cmd, usb_rx_buffer.buffer, DEBUG_CMD_SIZE);
 			switch (cmd) {
@@ -1337,6 +1340,7 @@ void vDebugTask(void *argument)
 				break;
 				*/
 			}
+#endif /* ifdef DEBUG */
 		}
 	}
   /* USER CODE END vDebugTask */
@@ -1522,7 +1526,7 @@ void vTransmitCallback(void *argument)
 
 	// Making Telemetry
 	UpdateTime();
-	telemetry.team_id = 1234;
+	telemetry.team_id = 2036;
 	telemetry.hours = sTime.Hours;
 	telemetry.minutes = sTime.Minutes;
 	telemetry.seconds = sTime.Seconds;
